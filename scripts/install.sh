@@ -191,6 +191,15 @@ if "${INSTALL_DIR}/certyn" --version >/dev/null 2>&1; then
   "${INSTALL_DIR}/certyn" --version
 fi
 
+# Install Claude Code skill (if skill files are in the archive)
+SKILL_SRC="$(find "$TMP_DIR" -maxdepth 3 -type d -name 'skills' | head -n1 || true)"
+if [[ -n "$SKILL_SRC" && -d "$SKILL_SRC/certyn" ]]; then
+  CLAUDE_SKILLS_DIR="${HOME}/.claude/skills/certyn"
+  mkdir -p "$CLAUDE_SKILLS_DIR"
+  cp "$SKILL_SRC/certyn/SKILL.md" "$CLAUDE_SKILLS_DIR/SKILL.md"
+  log "Installed Claude Code skill to ${CLAUDE_SKILLS_DIR}"
+fi
+
 if [[ ":${PATH}:" != *":${INSTALL_DIR}:"* ]]; then
   log ""
   log "Add certyn to your PATH:"
