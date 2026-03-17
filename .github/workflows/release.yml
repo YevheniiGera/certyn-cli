@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (v0.1.0)"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Verify tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test ./...
+
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            raw="${{ inputs.version }}"
+          else
+            raw="${GITHUB_REF_NAME}"
+          fi
+
+          raw="$(echo "$raw" | tr -d '[:space:]')"
+          if [ -z "$raw" ]; then
+            echo "Version cannot be empty" >&2
+            exit 1
+          fi
+
+          if [[ "$raw" != v* ]]; then
+            echo "Unsupported tag format '$raw'. Use vX.Y.Z" >&2
+            exit 1
+          fi
+
+          echo "version=$raw" >> "$GITHUB_OUTPUT"
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          bin_name="certyn"
+          if [ "$GOOS" = "windows" ]; then
+            bin_name="certyn.exe"
+          fi
+          go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o "dist/$bin_name" .
+
+      - name: Package archive
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          archive="certyn_${GOOS}_${GOARCH}.tar.gz"
+          tar -czf "$archive" -C dist .
+          shasum -a 256 "$archive" > "$archive.sha256"
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: dist
+          format: spdx-json
+          output-file: certyn_${{ matrix.goos }}_${{ matrix.goarch }}.sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: certyn-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            certyn_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz
+            certyn_${{ matrix.goos }}_${{ matrix.goarch }}.tar.gz.sha256
+            certyn_${{ matrix.goos }}_${{ matrix.goarch }}.sbom.spdx.json
+
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs: [verify, build]
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            raw="${{ inputs.version }}"
+          else
+            raw="${GITHUB_REF_NAME}"
+          fi
+
+          raw="$(echo "$raw" | tr -d '[:space:]')"
+          if [ -z "$raw" ]; then
+            echo "Version cannot be empty" >&2
+            exit 1
+          fi
+
+          if [[ "$raw" != v* ]]; then
+            echo "Unsupported tag format '$raw'. Use vX.Y.Z" >&2
+            exit 1
+          fi
+
+          echo "version=$raw" >> "$GITHUB_OUTPUT"
+
+      - name: Collect files
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find dist -type f \( -name '*.tar.gz' -o -name '*.sha256' -o -name '*.sbom.spdx.json' \) -exec cp {} release/ \;
+          ls -la release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          name: Certyn CLI ${{ steps.version.outputs.version }}
+          files: release/*
+          generate_release_notes: true
