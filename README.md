@@ -7,19 +7,19 @@ Go-based Certyn CLI for developer loops, CI gates, and self-hosted runner operat
 Pinned install (recommended):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YevheniiGera/certyn-cli/main/scripts/install.sh | bash -s -- --version v0.1.0
+curl -fsSL https://certyn.io/install | bash -s -- --version v0.1.0
 ```
 
 Latest install:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YevheniiGera/certyn-cli/main/scripts/install.sh | bash -s -- --latest
+curl -fsSL https://certyn.io/install | bash -s -- --latest
 ```
 
 PowerShell (Windows):
 
 ```powershell
-iex "& { $(iwr -useb https://raw.githubusercontent.com/YevheniiGera/certyn-cli/main/scripts/install.ps1) } -Version v0.1.0"
+iex "& { $(iwr -useb https://certyn.io/install.ps1) } -Version v0.1.0"
 ```
 
 ## Build
