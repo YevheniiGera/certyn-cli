@@ -30,6 +30,11 @@ func (f *fakeStore) Set(ref, value string) error {
 	return nil
 }
 
+func (f *fakeStore) Delete(ref string) error {
+	delete(f.items, ref)
+	return nil
+}
+
 func TestNormalizeAPIURL(t *testing.T) {
 	got := NormalizeAPIURL("https://api.certyn.io")
 	if got != "https://api.certyn.io/api" {
@@ -195,5 +200,12 @@ func TestProjectMappingsRoundTrip(t *testing.T) {
 	id, ok = reloaded.GetProjectMapping("dev", "other-project")
 	if ok || id != "" {
 		t.Fatalf("expected deleted mapping, got id=%q ok=%t", id, ok)
+	}
+}
+
+func TestInferAuthAudienceStripsApiSuffix(t *testing.T) {
+	got := InferAuthAudience("https://dev.api.certyn.io/api")
+	if got != "https://dev.api.certyn.io" {
+		t.Fatalf("expected https://dev.api.certyn.io, got %q", got)
 	}
 }

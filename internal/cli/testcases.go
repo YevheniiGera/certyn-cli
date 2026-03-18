@@ -10,10 +10,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newTestcasesCommand(app *App) *cobra.Command {
+func newTestsCommand(app *App) *cobra.Command {
 	testcasesCmd := &cobra.Command{
-		Use:   "testcases",
-		Short: "Test case triage operations",
+		Use:   "tests",
+		Short: "Manage test cases and execution triage",
 	}
 
 	testcasesCmd.AddCommand(newTestcasesListCommand(app))
@@ -27,6 +27,8 @@ func newTestcasesCommand(app *App) *cobra.Command {
 	testcasesCmd.AddCommand(newTestcasesDeleteCommand(app))
 	testcasesCmd.AddCommand(newTestcasesExecuteCommand(app))
 	testcasesCmd.AddCommand(newTestcasesExecuteBulkCommand(app))
+	testcasesCmd.AddCommand(newRemovedCommand("execute", "tests run"))
+	testcasesCmd.AddCommand(newRemovedCommand("execute-bulk", "tests run-many"))
 
 	tagsCmd := &cobra.Command{Use: "tags", Short: "Test case tag operations"}
 	tagsCmd.AddCommand(newTestcasesTagsSetCommand(app))
@@ -625,8 +627,8 @@ func newTestcasesExecuteCommand(app *App) *cobra.Command {
 	var project string
 
 	cmd := &cobra.Command{
-		Use:   "execute <testcase-id>",
-		Short: "Execute a single test case",
+		Use:   "run <testcase-id>",
+		Short: "Run a single test case",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			resolved, client, printer, err := app.ResolveRuntime(config.ResolveInput{Project: project}, true)
@@ -666,8 +668,8 @@ func newTestcasesExecuteBulkCommand(app *App) *cobra.Command {
 	var ids []string
 
 	cmd := &cobra.Command{
-		Use:   "execute-bulk",
-		Short: "Execute multiple test cases",
+		Use:   "run-many",
+		Short: "Run multiple test cases",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			normalizedIDs := nonEmptyValues(ids)
 			if len(normalizedIDs) == 0 {

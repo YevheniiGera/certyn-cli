@@ -17,11 +17,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var verifySuiteAliases = map[string]string{
-	"smoke":      "smoke-suite",
-	"regression": "regression-suite",
-}
-
 var nonAlphaNumericPattern = regexp.MustCompile(`[^a-z0-9]+`)
 
 type verifyOutput struct {
@@ -113,7 +108,7 @@ func newVerifyCommand(app *App) *cobra.Command {
 			}
 
 			if strings.TrimSpace(targetURL) == "" && effectiveEnvironment == "" {
-				return usageError("missing target: provide --url for ephemeral mode or --environment for existing-environment mode", nil)
+				return usageError("missing target: provide --url for preview mode or --environment for existing-environment mode", nil)
 			}
 
 			output, runErr := runVerify(cmd.Context(), app, client, resolved, verifyInput{
@@ -190,12 +185,12 @@ func runVerify(
 	resolved config.Runtime,
 	input verifyInput,
 ) (result verifyOutput, runErr error) {
-	result = verifyOutput{SchemaVersion: verifySchemaVersion, ExitCode: ExitOK}
+	result = verifyOutput{SchemaVersion: runSchemaVersion, ExitCode: ExitOK}
 
 	modeURL := strings.TrimSpace(input.URL)
 	modeEnvironment := strings.TrimSpace(input.Environment)
 	if modeURL == "" && modeEnvironment == "" {
-		runErr = usageError("missing target: provide --url for ephemeral mode or --environment for existing-environment mode", nil)
+		runErr = usageError("missing target: provide --url for preview mode or --environment for existing-environment mode", nil)
 		applyVerifyError(&result, runErr, ExitUsage)
 		return result, runErr
 	}
@@ -282,7 +277,7 @@ func runVerify(
 
 		envInput := api.EnvironmentInput{
 			Key:     envKey,
-			Label:   fmt.Sprintf("Local Verify %s", time.Now().UTC().Format("2006-01-02 15:04:05 UTC")),
+			Label:   fmt.Sprintf("Local Run %s", time.Now().UTC().Format("2006-01-02 15:04:05 UTC")),
 			BaseURL: result.URL,
 			Version: buildVerifyVersion(input.SHA),
 		}
@@ -346,7 +341,7 @@ func runVerify(
 
 	createResp, err := client.CreateCiRun(ctx, ciRequest, generateID())
 	if err != nil {
-		runErr = classifyAPIError(err, "failed to create verification run")
+		runErr = classifyAPIError(err, "failed to create run")
 		applyVerifyError(&result, runErr, ExitGateFailed)
 		return result, runErr
 	}
@@ -473,7 +468,7 @@ func attachVerifyFailureDiagnostics(
 		}
 		if strings.TrimSpace(diagnostic.DiagnoseCommand) == "" {
 			diagnostic.DiagnoseCommand = fmt.Sprintf(
-				"certyn executions diagnose --project %s %s",
+				"certyn diagnose --project %s %s",
 				projectSlug,
 				diagnostic.ExecutionID,
 			)
@@ -562,9 +557,9 @@ func attachVerifyExecutionDetails(
 func normalizeVerifySuiteInput(raw string) (suite string, processIdentifier string) {
 	normalized := strings.ToLower(strings.TrimSpace(raw))
 	if normalized == "" {
-		return "smoke", verifySuiteAliases["smoke"]
+		return "smoke", processAliases["smoke"]
 	}
-	if mapped, ok := verifySuiteAliases[normalized]; ok {
+	if mapped, ok := processAliases[normalized]; ok {
 		return normalized, mapped
 	}
 	return strings.TrimSpace(raw), strings.TrimSpace(raw)
@@ -573,7 +568,7 @@ func normalizeVerifySuiteInput(raw string) (suite string, processIdentifier stri
 func resolveVerifyProcessSlug(ctx context.Context, client *api.Client, projectID, identifier string) (string, error) {
 	requested := strings.TrimSpace(identifier)
 	if requested == "" {
-		requested = verifySuiteAliases["smoke"]
+		requested = processAliases["smoke"]
 	}
 
 	processes, err := client.ListProcesses(ctx, projectID)
@@ -705,7 +700,7 @@ func classifyVerifyEnvironmentError(err error, fallback string) error {
 	var apiErr *api.APIError
 	if errors.As(err, &apiErr) && (apiErr.StatusCode == http.StatusUnauthorized || apiErr.StatusCode == http.StatusForbidden) {
 		return authError(
-			"missing permission for environment management required by `certyn verify` (need environment create/delete access)",
+			"missing permission for environment management required by `certyn run --url` (need environment create/delete access)",
 			apiErr,
 		)
 	}

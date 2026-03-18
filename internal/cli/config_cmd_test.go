@@ -16,18 +16,6 @@ func TestConfigCommandsRespectGlobalJSONFlag(t *testing.T) {
 		"XDG_CONFIG_HOME": configDir,
 	}
 
-	initOut, _, err := executeRootCommand(t, []string{"--json", "config", "init"}, baseEnv)
-	if err != nil {
-		t.Fatalf("config init failed: %v", err)
-	}
-	var initPayload map[string]any
-	if err := json.Unmarshal([]byte(initOut), &initPayload); err != nil {
-		t.Fatalf("parse init JSON: %v\noutput: %s", err, initOut)
-	}
-	if initialized, ok := initPayload["initialized"].(bool); !ok || !initialized {
-		t.Fatalf("expected initialized=true, got %#v", initPayload["initialized"])
-	}
-
 	setOut, _, err := executeRootCommand(
 		t,
 		[]string{"--json", "config", "set", "--profile", "dev", "--environment", "staging"},
@@ -85,10 +73,6 @@ func TestConfigProjectsCommandsRespectGlobalJSONFlag(t *testing.T) {
 	configDir := t.TempDir()
 	baseEnv := map[string]string{
 		"XDG_CONFIG_HOME": configDir,
-	}
-
-	if _, _, err := executeRootCommand(t, []string{"config", "init"}, baseEnv); err != nil {
-		t.Fatalf("config init failed: %v", err)
 	}
 
 	mapOut, _, err := executeRootCommand(t, []string{
@@ -176,10 +160,6 @@ func TestConfigSetProjectResolvesAndStoresMapping(t *testing.T) {
 		"CERTYN_API_KEY":  "test-key",
 	}
 
-	if _, _, err := executeRootCommand(t, []string{"config", "init"}, baseEnv); err != nil {
-		t.Fatalf("config init failed: %v", err)
-	}
-
 	setOut, _, err := executeRootCommand(t, []string{
 		"--json", "config", "set",
 		"--profile", "dev",
@@ -227,10 +207,6 @@ func TestConfigSetProjectUnknownSlugLeavesMappingsUnchanged(t *testing.T) {
 		"XDG_CONFIG_HOME": configDir,
 		"CERTYN_API_URL":  server.URL,
 		"CERTYN_API_KEY":  "test-key",
-	}
-
-	if _, _, err := executeRootCommand(t, []string{"config", "init"}, baseEnv); err != nil {
-		t.Fatalf("config init failed: %v", err)
 	}
 
 	_, _, err := executeRootCommand(t, []string{
@@ -283,10 +259,6 @@ func TestConfigSetProjectAuthFailureLeavesMappingsUnchanged(t *testing.T) {
 		"XDG_CONFIG_HOME": configDir,
 	}
 
-	if _, _, err := executeRootCommand(t, []string{"config", "init"}, baseEnv); err != nil {
-		t.Fatalf("config init failed: %v", err)
-	}
-
 	_, _, err := executeRootCommand(t, []string{
 		"config", "set",
 		"--profile", "dev",
@@ -320,5 +292,25 @@ func TestConfigSetProjectAuthFailureLeavesMappingsUnchanged(t *testing.T) {
 	}
 	if len(listPayload.Mappings) != 0 {
 		t.Fatalf("expected empty mappings, got %#v", listPayload.Mappings)
+	}
+}
+
+func TestConfigInitRemovedShowsMigrationGuidance(t *testing.T) {
+	_, _, err := executeRootCommand(t, []string{"config", "init"}, map[string]string{
+		"XDG_CONFIG_HOME": t.TempDir(),
+	})
+	if err == nil {
+		t.Fatal("expected config init to fail")
+	}
+
+	var cmdErr *CommandError
+	if !errors.As(err, &cmdErr) {
+		t.Fatalf("expected CommandError, got %T (%v)", err, err)
+	}
+	if cmdErr.Code != ExitUsage {
+		t.Fatalf("expected usage exit code %d, got %d", ExitUsage, cmdErr.Code)
+	}
+	if got := cmdErr.Message; got != "certyn config init was removed; use `certyn init`" {
+		t.Fatalf("unexpected migration guidance: %q", got)
 	}
 }

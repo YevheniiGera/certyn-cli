@@ -16,6 +16,8 @@ import (
 const (
 	DefaultAPIURL      = "https://api.certyn.io"
 	DefaultProfileName = "default"
+	DefaultAuthIssuer  = "https://auth.certyn.io"
+	DefaultAuthClientID = "vOfBJycsLfy5QVQ7srQGOFfyDv8tmO7N"
 )
 
 type File struct {
@@ -24,11 +26,16 @@ type File struct {
 }
 
 type Profile struct {
-	APIURL      string            `yaml:"api_url,omitempty"`
-	Project     string            `yaml:"project,omitempty"`
-	Environment string            `yaml:"environment,omitempty"`
-	APIKeyRef   string            `yaml:"api_key_ref,omitempty"`
-	ProjectIDs  map[string]string `yaml:"project_ids,omitempty"`
+	APIURL          string            `yaml:"api_url,omitempty"`
+	Project         string            `yaml:"project,omitempty"`
+	Environment     string            `yaml:"environment,omitempty"`
+	APIKeyRef       string            `yaml:"api_key_ref,omitempty"`
+	AuthIssuer      string            `yaml:"auth_issuer,omitempty"`
+	AuthAudience    string            `yaml:"auth_audience,omitempty"`
+	AuthClientID    string            `yaml:"auth_client_id,omitempty"`
+	AccessTokenRef  string            `yaml:"access_token_ref,omitempty"`
+	RefreshTokenRef string            `yaml:"refresh_token_ref,omitempty"`
+	ProjectIDs      map[string]string `yaml:"project_ids,omitempty"`
 }
 
 type ResolveInput struct {
@@ -40,11 +47,16 @@ type ResolveInput struct {
 }
 
 type Runtime struct {
-	Profile     string
-	APIURL      string
-	APIKey      string
-	Project     string
-	Environment string
+	Profile      string
+	APIURL       string
+	APIKey       string
+	AccessToken  string
+	RefreshToken string
+	AuthIssuer   string
+	AuthAudience string
+	AuthClientID string
+	Project      string
+	Environment  string
 }
 
 type Manager struct {
@@ -124,14 +136,17 @@ func (m *Manager) Resolve(input ResolveInput) (Runtime, error) {
 	)
 
 	profile := m.Data.Profiles[profileName]
+	configuredAPIURL := firstNonEmpty(
+		strings.TrimSpace(input.APIURL),
+		strings.TrimSpace(os.Getenv("CERTYN_API_URL")),
+		strings.TrimSpace(profile.APIURL),
+		DefaultAPIURL,
+	)
 
 	resolved := Runtime{
 		Profile: profileName,
 		APIURL: firstNonEmpty(
-			strings.TrimSpace(input.APIURL),
-			strings.TrimSpace(os.Getenv("CERTYN_API_URL")),
-			strings.TrimSpace(profile.APIURL),
-			DefaultAPIURL,
+			configuredAPIURL,
 		),
 		Project: firstNonEmpty(
 			strings.TrimSpace(input.Project),
@@ -142,6 +157,21 @@ func (m *Manager) Resolve(input ResolveInput) (Runtime, error) {
 			strings.TrimSpace(input.Environment),
 			strings.TrimSpace(os.Getenv("CERTYN_ENVIRONMENT")),
 			strings.TrimSpace(profile.Environment),
+		),
+		AuthIssuer: firstNonEmpty(
+			strings.TrimSpace(os.Getenv("CERTYN_AUTH_ISSUER")),
+			strings.TrimSpace(profile.AuthIssuer),
+			DefaultAuthIssuer,
+		),
+		AuthAudience: firstNonEmpty(
+			strings.TrimSpace(os.Getenv("CERTYN_AUTH_AUDIENCE")),
+			strings.TrimSpace(profile.AuthAudience),
+			InferAuthAudience(configuredAPIURL),
+		),
+		AuthClientID: firstNonEmpty(
+			strings.TrimSpace(os.Getenv("CERTYN_AUTH_CLIENT_ID")),
+			strings.TrimSpace(profile.AuthClientID),
+			DefaultAuthClientID,
 		),
 	}
 
@@ -154,6 +184,18 @@ func (m *Manager) Resolve(input ResolveInput) (Runtime, error) {
 		secretValue, err := m.Store.Get(profile.APIKeyRef)
 		if err == nil {
 			resolved.APIKey = strings.TrimSpace(secretValue)
+		}
+	}
+	if profile.AccessTokenRef != "" {
+		secretValue, err := m.Store.Get(profile.AccessTokenRef)
+		if err == nil {
+			resolved.AccessToken = strings.TrimSpace(secretValue)
+		}
+	}
+	if profile.RefreshTokenRef != "" {
+		secretValue, err := m.Store.Get(profile.RefreshTokenRef)
+		if err == nil {
+			resolved.RefreshToken = strings.TrimSpace(secretValue)
 		}
 	}
 
@@ -287,6 +329,25 @@ func NormalizeAPIURL(input string) string {
 	}
 	u.Path = path
 	u.RawPath = ""
+	return strings.TrimSuffix(u.String(), "/")
+}
+
+func InferAuthAudience(input string) string {
+	normalized := NormalizeAPIURL(input)
+	u, err := url.Parse(normalized)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return strings.TrimSuffix(strings.TrimSuffix(normalized, "/"), "/api")
+	}
+
+	path := strings.TrimSuffix(u.Path, "/")
+	path = strings.TrimSuffix(path, "/api")
+	if path == "" {
+		path = "/"
+	}
+	u.Path = path
+	u.RawPath = ""
+	u.RawQuery = ""
+	u.Fragment = ""
 	return strings.TrimSuffix(u.String(), "/")
 }
 

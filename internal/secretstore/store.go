@@ -15,10 +15,12 @@ const serviceName = "certyn-cli"
 var ErrSecretNotFound = errors.New("secret not found")
 var keyringSet = keyring.Set
 var keyringGet = keyring.Get
+var keyringDelete = keyring.Delete
 
 type Store interface {
 	Get(ref string) (string, error)
 	Set(ref, value string) error
+	Delete(ref string) error
 }
 
 type HybridStore struct {
@@ -61,6 +63,18 @@ func (s *HybridStore) Set(ref, value string) error {
 	return s.file.Set(ref, value)
 }
 
+func (s *HybridStore) Delete(ref string) error {
+	if ref == "" {
+		return errors.New("secret ref is required")
+	}
+
+	if err := keyringDelete(serviceName, ref); err == nil {
+		return nil
+	}
+
+	return s.file.Delete(ref)
+}
+
 type fileSecrets struct {
 	Secrets map[string]string `yaml:"secrets"`
 }
@@ -90,6 +104,15 @@ func (s *fileStore) Set(ref, value string) error {
 		cfg.Secrets = make(map[string]string)
 	}
 	cfg.Secrets[ref] = value
+	return s.write(cfg)
+}
+
+func (s *fileStore) Delete(ref string) error {
+	cfg, err := s.read()
+	if err != nil {
+		return err
+	}
+	delete(cfg.Secrets, ref)
 	return s.write(cfg)
 }
 

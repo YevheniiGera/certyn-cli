@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	verifySchemaVersion            = "certyn.verify.v1"
+	runSchemaVersion               = "certyn.run.v1"
 	executionDiagnoseSchemaVersion = "certyn.execution_diagnose.v1"
 )
 
@@ -223,7 +223,7 @@ func collectExecutionDiagnostics(
 	projectHint := strings.TrimSpace(projectSlug)
 	if projectHint != "" {
 		diagnostic.DiagnoseCommand = fmt.Sprintf(
-			"certyn executions diagnose --project %s %s",
+			"certyn diagnose --project %s %s",
 			projectHint,
 			diagnostic.ExecutionID,
 		)

@@ -118,6 +118,11 @@ try {
   } catch {
     Write-Info "Installed. Run `"$destination --help`" to verify."
   }
+
+  Write-Info ""
+  Write-Info "Next steps:"
+  Write-Info "  Local machine: $destination login"
+  Write-Info "  CI/agents: set CERTYN_API_KEY and run `"$destination ci run ...`""
 }
 finally {
   if (Test-Path -Path $tempDir) {

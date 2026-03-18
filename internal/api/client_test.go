@@ -285,6 +285,53 @@ func TestGetProcessRunDecodesItems(t *testing.T) {
 	}
 }
 
+func TestClientUsesBearerTokenWhenApiKeyMissing(t *testing.T) {
+	var authHeader string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader = r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{"defaultProjectId":"","projects":[]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "")
+	client.SetAccessToken("token-123")
+
+	if _, err := client.GetProjectsOverview(context.Background()); err != nil {
+		t.Fatalf("GetProjectsOverview failed: %v", err)
+	}
+
+	if authHeader != "Bearer token-123" {
+		t.Fatalf("expected bearer token header, got %q", authHeader)
+	}
+}
+
+func TestClientPrefersBearerTokenOverAPIKey(t *testing.T) {
+	var authHeader string
+	var apiKeyHeader string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader = r.Header.Get("Authorization")
+		apiKeyHeader = r.Header.Get("X-API-Key")
+		_, _ = w.Write([]byte(`{"defaultProjectId":"","projects":[]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key")
+	client.SetAccessToken("token-123")
+
+	if _, err := client.GetProjectsOverview(context.Background()); err != nil {
+		t.Fatalf("GetProjectsOverview failed: %v", err)
+	}
+
+	if authHeader != "Bearer token-123" {
+		t.Fatalf("expected bearer token header, got %q", authHeader)
+	}
+	if apiKeyHeader != "" {
+		t.Fatalf("expected X-API-Key to be omitted when bearer auth is present, got %q", apiKeyHeader)
+	}
+}
+
 func TestAskAdvisorSendsPayloadAndDecodesResponse(t *testing.T) {
 	var captured map[string]any
 

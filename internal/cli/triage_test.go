@@ -20,20 +20,113 @@ const mappedProjectID = "11111111-2222-4333-8444-555555555555"
 func TestTriageCommandAliasesRegistered(t *testing.T) {
 	root := NewRootCommand()
 
-	issuesCmd, _, err := root.Find([]string{"tickets"})
+	issuesCmd, _, err := root.Find([]string{"issues"})
 	if err != nil {
-		t.Fatalf("expected tickets alias to resolve: %v", err)
+		t.Fatalf("expected issues command to resolve: %v", err)
 	}
 	if issuesCmd.Name() != "issues" {
-		t.Fatalf("expected tickets alias to resolve to issues command, got %q", issuesCmd.Name())
+		t.Fatalf("expected issues command, got %q", issuesCmd.Name())
 	}
 
 	envCmd, _, err := root.Find([]string{"environments"})
 	if err != nil {
-		t.Fatalf("expected environments alias to resolve: %v", err)
+		t.Fatalf("expected environments command to resolve: %v", err)
 	}
-	if envCmd.Name() != "env" {
-		t.Fatalf("expected environments alias to resolve to env command, got %q", envCmd.Name())
+	if envCmd.Name() != "environments" {
+		t.Fatalf("expected canonical environments command, got %q", envCmd.Name())
+	}
+}
+
+func TestRemovedCommandsShowMigrationGuidance(t *testing.T) {
+	t.Run("env", func(t *testing.T) {
+		_, _, err := executeRootCommand(t, []string{"env", "list"}, map[string]string{
+			"XDG_CONFIG_HOME": t.TempDir(),
+		})
+		if err == nil {
+			t.Fatal("expected env command to fail")
+		}
+		var cmdErr *CommandError
+		if !errors.As(err, &cmdErr) {
+			t.Fatalf("expected CommandError, got %T (%v)", err, err)
+		}
+		if got := cmdErr.Message; got != "certyn env was removed; use `certyn environments`" {
+			t.Fatalf("unexpected migration guidance: %q", got)
+		}
+	})
+
+	t.Run("testcases", func(t *testing.T) {
+		_, _, err := executeRootCommand(t, []string{"testcases", "list"}, map[string]string{
+			"XDG_CONFIG_HOME": t.TempDir(),
+		})
+		if err == nil {
+			t.Fatal("expected testcases command to fail")
+		}
+		var cmdErr *CommandError
+		if !errors.As(err, &cmdErr) {
+			t.Fatalf("expected CommandError, got %T (%v)", err, err)
+		}
+		if got := cmdErr.Message; got != "certyn testcases was removed; use `certyn tests`" {
+			t.Fatalf("unexpected migration guidance: %q", got)
+		}
+	})
+
+	t.Run("verify", func(t *testing.T) {
+		_, _, err := executeRootCommand(t, []string{"verify", "--project", "my-project"}, map[string]string{
+			"XDG_CONFIG_HOME": t.TempDir(),
+		})
+		if err == nil {
+			t.Fatal("expected verify command to fail")
+		}
+		var cmdErr *CommandError
+		if !errors.As(err, &cmdErr) {
+			t.Fatalf("expected CommandError, got %T (%v)", err, err)
+		}
+		if got := cmdErr.Message; got != "certyn verify was removed; use `certyn run --url ...` or `certyn run --environment ...`" {
+			t.Fatalf("unexpected migration guidance: %q", got)
+		}
+	})
+
+	t.Run("ci run", func(t *testing.T) {
+		_, _, err := executeRootCommand(t, []string{"ci", "run", "smoke"}, map[string]string{
+			"XDG_CONFIG_HOME": t.TempDir(),
+		})
+		if err == nil {
+			t.Fatal("expected ci run command to fail")
+		}
+		var cmdErr *CommandError
+		if !errors.As(err, &cmdErr) {
+			t.Fatalf("expected CommandError, got %T (%v)", err, err)
+		}
+		if got := cmdErr.Message; got != "certyn ci run was removed; use `certyn run`" {
+			t.Fatalf("unexpected migration guidance: %q", got)
+		}
+	})
+}
+
+func TestRootHelpShowsCoreAndAdvancedCommands(t *testing.T) {
+	stdout, _, err := executeRootCommand(t, []string{"--help"}, map[string]string{
+		"XDG_CONFIG_HOME": t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("expected help to succeed, got %v", err)
+	}
+	if !strings.Contains(stdout, "Core Commands") {
+		t.Fatalf("expected Core Commands group in help, got:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "Advanced Commands") {
+		t.Fatalf("expected Advanced Commands group in help, got:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "diagnose") {
+		t.Fatalf("expected diagnose command in help, got:\n%s", stdout)
+	}
+	if !strings.Contains(stdout, "run") {
+		t.Fatalf("expected run command in help, got:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "testcases") {
+		t.Fatalf("did not expect removed testcases command in help, got:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "\n  ci ") || strings.Contains(stdout, "\n  verify ") {
+		t.Fatalf("did not expect removed ci/verify commands in help, got:\n%s", stdout)
 	}
 }
 
@@ -50,7 +143,7 @@ func TestTestcasesListMapsQueryParameters(t *testing.T) {
 	defer server.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"--json", "testcases", "list",
+		"--json", "tests", "list",
 		"--project", "my-project",
 		"--tag", "smoke",
 		"--quarantined", "true",
@@ -254,8 +347,8 @@ func TestTriageGetCommandsEmitJSON(t *testing.T) {
 		wantID string
 	}{
 		{
-			name:   "testcases get",
-			args:   []string{"--json", "testcases", "get", "--project", "my-project", "tc-1"},
+			name:   "tests get",
+			args:   []string{"--json", "tests", "get", "--project", "my-project", "tc-1"},
 			wantID: "tc-1",
 		},
 		{
@@ -584,7 +677,7 @@ func TestTriageListWithMissingProjectMappingFailsBeforeAPICall(t *testing.T) {
 	defer server.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"testcases", "list",
+		"tests", "list",
 		"--project", "unknown-project",
 	}, triageBaseEnv(t, server.URL))
 	if err == nil {
@@ -615,7 +708,7 @@ func TestTriageListWithStaleProjectMappingReturnsRemediationHint(t *testing.T) {
 	defer server.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"testcases", "list",
+		"tests", "list",
 		"--project", "my-project",
 	}, triageBaseEnv(t, server.URL))
 	if err == nil {
@@ -651,7 +744,7 @@ func TestTestcasesCreateUsesMappedProjectAndPayload(t *testing.T) {
 	defer server.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "testcases", "create",
+		"--json", "tests", "create",
 		"--project", "my-project",
 		"--name", "Checkout",
 		"--instructions", "steps",
@@ -699,7 +792,7 @@ func TestTestcasesUpdateRequiresAtLeastOneField(t *testing.T) {
 	defer server.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"testcases", "update", "--project", "my-project", "tc-1",
+		"tests", "update", "--project", "my-project", "tc-1",
 	}, triageBaseEnv(t, server.URL))
 	if err == nil {
 		t.Fatal("expected usage error")
@@ -725,7 +818,7 @@ func TestTestcasesExecuteBulkRequiresIDs(t *testing.T) {
 	defer server.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"testcases", "execute-bulk", "--project", "my-project",
+		"tests", "run-many", "--project", "my-project",
 	}, triageBaseEnv(t, server.URL))
 	if err == nil {
 		t.Fatal("expected usage error")
@@ -762,7 +855,7 @@ func TestTestcasesExecuteBulkSendsArrayPayload(t *testing.T) {
 	defer server.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "testcases", "execute-bulk",
+		"--json", "tests", "run-many",
 		"--project", "my-project",
 		"--id", "tc-1",
 	}, triageBaseEnv(t, server.URL))
@@ -783,7 +876,7 @@ func TestTestcasesExecuteBulkSendsArrayPayload(t *testing.T) {
 	}
 }
 
-func TestIssuesCreateViaTicketsAliasUsesMappedProject(t *testing.T) {
+func TestIssuesCreateUsesMappedProject(t *testing.T) {
 	var captured map[string]any
 	server := newTriageTestServer(t, func(w http.ResponseWriter, r *http.Request) bool {
 		if r.Method == http.MethodPost && r.URL.Path == "/api/projects/"+mappedProjectID+"/tickets" {
@@ -800,7 +893,7 @@ func TestIssuesCreateViaTicketsAliasUsesMappedProject(t *testing.T) {
 	defer server.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "tickets", "create",
+		"--json", "issues", "create",
 		"--project", "my-project",
 		"--title", "Broken login",
 		"--type", "bug",
@@ -851,7 +944,7 @@ func TestIssuesAttachmentAddFileEncodesBase64(t *testing.T) {
 	}
 
 	_, _, err := executeRootCommand(t, []string{
-		"--json", "issues", "attachment", "add", "--project", "my-project", "iss-1",
+		"--json", "issues", "attach", "--project", "my-project", "iss-1",
 		"--kind", "screenshot",
 		"--file", filePath,
 		"--description", "evidence",
@@ -895,7 +988,7 @@ func TestIssuesAttachmentAddURLPayload(t *testing.T) {
 	defer server.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"--json", "issues", "attachment", "add", "--project", "my-project", "iss-1",
+		"--json", "issues", "attach", "--project", "my-project", "iss-1",
 		"--kind", "log",
 		"--url", "https://example.com/file.txt",
 		"--description", "ref",
@@ -926,7 +1019,7 @@ func TestIssuesAttachmentAddRejectsFileAndURL(t *testing.T) {
 	}
 
 	_, _, err := executeRootCommand(t, []string{
-		"issues", "attachment", "add", "--project", "my-project", "iss-1",
+		"issues", "attach", "--project", "my-project", "iss-1",
 		"--kind", "log",
 		"--file", filePath,
 		"--url", "https://example.com/file.txt",
@@ -955,7 +1048,7 @@ func TestIssuesVerificationAddRejectsInvalidDecision(t *testing.T) {
 	defer server.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"issues", "verification", "add", "--project", "my-project", "iss-1",
+		"issues", "verify", "--project", "my-project", "iss-1",
 		"--decision", "unknown",
 		"--summary", "summary",
 	}, triageBaseEnv(t, server.URL))
@@ -996,7 +1089,7 @@ func TestIssuesVerificationAddScreenshotEncodesBase64(t *testing.T) {
 	}
 
 	_, _, err := executeRootCommand(t, []string{
-		"--json", "issues", "verification", "add", "--project", "my-project", "iss-1",
+		"--json", "issues", "verify", "--project", "my-project", "iss-1",
 		"--decision", "passed",
 		"--summary", "done",
 		"--expected", "a",

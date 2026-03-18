@@ -56,14 +56,23 @@ func (a *App) ResolveRuntime(overrides config.ResolveInput, requireAPIKey bool) 
 		return config.Runtime{}, nil, output.Printer{}, usageError("failed to resolve runtime config", err)
 	}
 
-	if requireAPIKey && strings.TrimSpace(resolved.APIKey) == "" {
-		return config.Runtime{}, nil, output.Printer{}, usageError(
-			"missing API key",
-			errors.New("provide --api-key, CERTYN_API_KEY, or a profile api_key_ref in config"),
+	if strings.TrimSpace(resolved.AccessToken) != "" {
+		refreshed, refreshErr := a.refreshSessionIfNeeded(resolved)
+		if refreshErr != nil {
+			return config.Runtime{}, nil, output.Printer{}, refreshErr
+		}
+		resolved = refreshed
+	}
+
+	if requireAPIKey && strings.TrimSpace(resolved.APIKey) == "" && strings.TrimSpace(resolved.AccessToken) == "" {
+		return config.Runtime{}, nil, output.Printer{}, authError(
+			"authentication required",
+			errors.New(authConfigurationHint()),
 		)
 	}
 
 	client := api.NewClient(resolved.APIURL, resolved.APIKey)
+	client.SetAccessToken(resolved.AccessToken)
 	client.SetUserAgent(fmt.Sprintf("certyn-cli/%s", Version))
 	printer := output.Printer{JSON: a.flags.JSON}
 

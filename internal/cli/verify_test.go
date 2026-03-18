@@ -114,7 +114,7 @@ func TestVerifySuiteModeCreatesEnvironmentRunsAndCleansUp(t *testing.T) {
 
 	configHome := t.TempDir()
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "verify",
+		"--json", "run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 	}, verifyBaseEnv(configHome, apiServer.URL))
@@ -142,8 +142,8 @@ func TestVerifySuiteModeCreatesEnvironmentRunsAndCleansUp(t *testing.T) {
 	if payload["mode"] != "suite" {
 		t.Fatalf("expected mode=suite, got %#v", payload["mode"])
 	}
-	if payload["schema_version"] != verifySchemaVersion {
-		t.Fatalf("expected schema_version=%s, got %#v", verifySchemaVersion, payload["schema_version"])
+	if payload["schema_version"] != runSchemaVersion {
+		t.Fatalf("expected schema_version=%s, got %#v", runSchemaVersion, payload["schema_version"])
 	}
 	if payload["suite"] != "smoke" {
 		t.Fatalf("expected suite=smoke, got %#v", payload["suite"])
@@ -234,10 +234,9 @@ func TestVerifyTagsModeUsesTagsAndIgnoresSuite(t *testing.T) {
 	defer apiServer.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "verify",
+		"--json", "run",
 		"--project", "my-project",
 		"--url", localApp.URL,
-		"--suite", "regression",
 		"--tag", "checkout",
 		"--tag", "payments",
 	}, verifyBaseEnv(t.TempDir(), apiServer.URL))
@@ -325,10 +324,9 @@ func TestVerifyCustomSuiteResolvesFromAPI(t *testing.T) {
 	defer apiServer.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "verify",
+		"--json", "run", "checkout-suite",
 		"--project", "my-project",
 		"--url", localApp.URL,
-		"--suite", "checkout-suite",
 	}, verifyBaseEnv(t.TempDir(), apiServer.URL))
 	if err != nil {
 		t.Fatalf("verify should succeed for custom suite: %v", err)
@@ -385,9 +383,8 @@ func TestVerifySuiteModeFallsBackWhenProcessDiscoveryUnauthorized(t *testing.T) 
 	stdout, _, err := executeRootCommand(t, []string{
 		"--json",
 		"--environment", "staging",
-		"verify",
+		"run", "smoke",
 		"--project", "my-project",
-		"--suite", "smoke",
 	}, verifyBaseEnv(t.TempDir(), apiServer.URL))
 	if err != nil {
 		t.Fatalf("verify should succeed when process discovery is unauthorized: %v", err)
@@ -461,7 +458,7 @@ func TestVerifyExistingEnvironmentModeUsesProvidedEnvAndSkipsEnvLifecycle(t *tes
 	stdout, _, err := executeRootCommand(t, []string{
 		"--json",
 		"--environment", "staging",
-		"verify",
+		"run",
 		"--project", "my-project",
 	}, verifyBaseEnv(t.TempDir(), apiServer.URL))
 	if err != nil {
@@ -494,7 +491,7 @@ func TestVerifyExistingEnvironmentModeUsesProvidedEnvAndSkipsEnvLifecycle(t *tes
 }
 
 func TestVerifyRequiresTargetURLOrEnvironment(t *testing.T) {
-	_, _, err := executeRootCommand(t, []string{"verify", "--project", "my-project"}, map[string]string{
+	_, _, err := executeRootCommand(t, []string{"run", "--project", "my-project"}, map[string]string{
 		"CERTYN_API_URL":  "https://api.example.com",
 		"CERTYN_API_KEY":  "test-key",
 		"XDG_CONFIG_HOME": t.TempDir(),
@@ -522,7 +519,7 @@ func TestVerifyRejectsConflictingURLAndEnvironment(t *testing.T) {
 	defer localApp.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"verify",
+		"run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 		"--environment", "staging",
@@ -599,7 +596,7 @@ func TestVerifyURLOverridesImplicitEnvironmentDefaults(t *testing.T) {
 	defer apiServer.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "verify",
+		"--json", "run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 	}, map[string]string{
@@ -630,7 +627,7 @@ func TestVerifyURLOverridesImplicitEnvironmentDefaults(t *testing.T) {
 
 func TestVerifyRejectsInvalidURL(t *testing.T) {
 	_, _, err := executeRootCommand(t, []string{
-		"verify",
+		"run",
 		"--project", "my-project",
 		"--url", "ftp://localhost",
 	}, map[string]string{
@@ -653,7 +650,7 @@ func TestVerifyRejectsInvalidURL(t *testing.T) {
 
 func TestVerifyFailsWhenURLIsUnreachable(t *testing.T) {
 	_, _, err := executeRootCommand(t, []string{
-		"verify",
+		"run",
 		"--project", "my-project",
 		"--url", "http://127.0.0.1:1",
 	}, map[string]string{
@@ -684,7 +681,7 @@ func TestVerifyRejectsInvalidDiagnosticsMaxEvents(t *testing.T) {
 	defer localApp.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"verify",
+		"run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 		"--diagnostics-max-events", "0",
@@ -716,7 +713,7 @@ func TestVerifyRejectsInvalidDiagnosticsSampleSize(t *testing.T) {
 	defer localApp.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"verify",
+		"run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 		"--diagnostics-sample-size", "-1",
@@ -748,7 +745,7 @@ func TestVerifyMissingProjectFails(t *testing.T) {
 	defer localApp.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"verify",
+		"run",
 		"--url", localApp.URL,
 	}, map[string]string{
 		"CERTYN_API_URL":  "https://api.example.com",
@@ -804,7 +801,7 @@ func TestVerifyFailsHardOnEnvironmentPermissionError(t *testing.T) {
 	defer apiServer.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"verify",
+		"run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 	}, verifyBaseEnv(t.TempDir(), apiServer.URL))
@@ -871,7 +868,7 @@ func TestVerifyKeepEnvSkipsDeletion(t *testing.T) {
 	defer apiServer.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "verify",
+		"--json", "run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 		"--keep-env",
@@ -939,7 +936,7 @@ func TestVerifyDeletesEnvironmentOnGateFailure(t *testing.T) {
 	defer apiServer.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "verify",
+		"--json", "run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 	}, verifyBaseEnv(t.TempDir(), apiServer.URL))
@@ -1077,7 +1074,7 @@ func TestVerifyGateFailureCollectsDiagnosticsForFailedExecutionsOnly(t *testing.
 	defer apiServer.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "verify",
+		"--json", "run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 	}, verifyBaseEnv(t.TempDir(), apiServer.URL))
@@ -1142,7 +1139,7 @@ func TestVerifyGateFailureCollectsDiagnosticsForFailedExecutionsOnly(t *testing.
 	if !strings.Contains(firstNetworkFailure["url"].(string), "token=ABC123") {
 		t.Fatalf("expected unredacted url, got %#v", firstNetworkFailure["url"])
 	}
-	if !strings.Contains(diagnostic["diagnose_command"].(string), "executions diagnose") {
+	if !strings.Contains(diagnostic["diagnose_command"].(string), "certyn diagnose") {
 		t.Fatalf("expected diagnose command hint, got %#v", diagnostic["diagnose_command"])
 	}
 	if !strings.Contains(diagnostic["conversation_command"].(string), "executions conversation") {
@@ -1203,7 +1200,7 @@ func TestVerifyGateFailureCanSkipDiagnosticsCollection(t *testing.T) {
 	defer apiServer.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "verify",
+		"--json", "run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 		"--diagnose-failed=false",
@@ -1277,7 +1274,7 @@ func TestVerifyDiagnosticsErrorsDoNotOverrideGateFailure(t *testing.T) {
 	defer apiServer.Close()
 
 	stdout, _, err := executeRootCommand(t, []string{
-		"--json", "verify",
+		"--json", "run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 	}, verifyBaseEnv(t.TempDir(), apiServer.URL))
@@ -1369,7 +1366,7 @@ func TestVerifyDeletesEnvironmentOnTimeout(t *testing.T) {
 	defer apiServer.Close()
 
 	_, _, err := executeRootCommand(t, []string{
-		"verify",
+		"run",
 		"--project", "my-project",
 		"--url", localApp.URL,
 		"--timeout", "50ms",

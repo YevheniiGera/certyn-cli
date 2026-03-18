@@ -21,9 +21,8 @@ var (
 
 func newIssuesCommand(app *App) *cobra.Command {
 	issuesCmd := &cobra.Command{
-		Use:     "issues",
-		Aliases: []string{"tickets"},
-		Short:   "Issue triage operations",
+		Use:   "issues",
+		Short: "Manage issue triage and verification",
 	}
 
 	issuesCmd.AddCommand(newIssuesListCommand(app))
@@ -33,23 +32,15 @@ func newIssuesCommand(app *App) *cobra.Command {
 	issuesCmd.AddCommand(newIssuesUpdateCommand(app))
 	issuesCmd.AddCommand(newIssuesDeleteCommand(app))
 	issuesCmd.AddCommand(newIssuesLinkTestcaseCommand(app))
+	issuesCmd.AddCommand(newRemovedCommand("link-testcase", "issues link-test"))
+	issuesCmd.AddCommand(newIssuesCommentAddCommand(app))
+	issuesCmd.AddCommand(newIssuesAttachmentAddCommand(app))
+	issuesCmd.AddCommand(newIssuesVerificationAddCommand(app))
 	issuesCmd.AddCommand(newIssuesRetestCommand(app))
 
 	labelsCmd := &cobra.Command{Use: "labels", Short: "Issue label operations"}
 	labelsCmd.AddCommand(newIssuesLabelsSetCommand(app))
 	issuesCmd.AddCommand(labelsCmd)
-
-	commentCmd := &cobra.Command{Use: "comment", Short: "Issue comment operations"}
-	commentCmd.AddCommand(newIssuesCommentAddCommand(app))
-	issuesCmd.AddCommand(commentCmd)
-
-	attachmentCmd := &cobra.Command{Use: "attachment", Short: "Issue attachment operations"}
-	attachmentCmd.AddCommand(newIssuesAttachmentAddCommand(app))
-	issuesCmd.AddCommand(attachmentCmd)
-
-	verificationCmd := &cobra.Command{Use: "verification", Short: "Issue verification operations"}
-	verificationCmd.AddCommand(newIssuesVerificationAddCommand(app))
-	issuesCmd.AddCommand(verificationCmd)
 
 	return issuesCmd
 }
@@ -560,8 +551,8 @@ func newIssuesLinkTestcaseCommand(app *App) *cobra.Command {
 	var priority string
 
 	cmd := &cobra.Command{
-		Use:   "link-testcase <issue-id>",
-		Short: "Link a test case to an issue",
+		Use:   "link-test <issue-id>",
+		Short: "Link a test to an issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := requireValue("testcase", testCaseID); err != nil {
@@ -612,7 +603,7 @@ func newIssuesCommentAddCommand(app *App) *cobra.Command {
 	var body string
 
 	cmd := &cobra.Command{
-		Use:   "add <issue-id>",
+		Use:   "comment <issue-id>",
 		Short: "Add a comment to an issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -658,8 +649,8 @@ func newIssuesAttachmentAddCommand(app *App) *cobra.Command {
 	var description string
 
 	cmd := &cobra.Command{
-		Use:   "add <issue-id>",
-		Short: "Add an attachment to an issue",
+		Use:   "attach <issue-id>",
+		Short: "Attach a file or URL to an issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := requireValue("kind", kind); err != nil {
@@ -735,8 +726,8 @@ func newIssuesVerificationAddCommand(app *App) *cobra.Command {
 	var screenshotFile string
 
 	cmd := &cobra.Command{
-		Use:   "add <issue-id>",
-		Short: "Add a verification to an issue",
+		Use:   "verify <issue-id>",
+		Short: "Add a verification result to an issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := requireValue("decision", decision); err != nil {

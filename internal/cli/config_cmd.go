@@ -14,42 +14,17 @@ import (
 func newConfigCommand(app *App) *cobra.Command {
 	configCmd := &cobra.Command{
 		Use:   "config",
-		Short: "Manage CLI configuration",
+		Short: "Manage profiles and stored defaults",
 	}
 
-	configCmd.AddCommand(newConfigInitCommand(app))
 	configCmd.AddCommand(newConfigSetCommand(app))
 	configCmd.AddCommand(newConfigUseCommand(app))
 	configCmd.AddCommand(newConfigShowCommand(app))
 	configCmd.AddCommand(newConfigProfilesCommand(app))
 	configCmd.AddCommand(newConfigProjectsCommand(app))
+	configCmd.AddCommand(newRemovedCommand("init", "init"))
 
 	return configCmd
-}
-
-func newConfigInitCommand(app *App) *cobra.Command {
-	return &cobra.Command{
-		Use:   "init",
-		Short: "Initialize config file",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := app.ConfigManager()
-			if err != nil {
-				return err
-			}
-			if err := cfg.Save(); err != nil {
-				return usageError("failed to initialize config", err)
-			}
-			printer := output.Printer{JSON: app.flags.JSON}
-			if printer.JSON {
-				return printer.EmitJSON(map[string]any{
-					"path":        cfg.Path,
-					"initialized": true,
-				})
-			}
-			fmt.Printf("Config initialized at %s\n", cfg.Path)
-			return nil
-		},
-	}
 }
 
 func newConfigSetCommand(app *App) *cobra.Command {
@@ -59,6 +34,11 @@ func newConfigSetCommand(app *App) *cobra.Command {
 	var environment string
 	var apiKeyRef string
 	var apiKey string
+	var authIssuer string
+	var authAudience string
+	var authClientID string
+	var accessTokenRef string
+	var refreshTokenRef string
 
 	cmd := &cobra.Command{
 		Use:   "set",
@@ -88,6 +68,21 @@ func newConfigSetCommand(app *App) *cobra.Command {
 			}
 			if cmd.Flags().Changed("api-key-ref") {
 				current.APIKeyRef = apiKeyRef
+			}
+			if cmd.Flags().Changed("auth-issuer") {
+				current.AuthIssuer = strings.TrimSpace(authIssuer)
+			}
+			if cmd.Flags().Changed("auth-audience") {
+				current.AuthAudience = strings.TrimSpace(authAudience)
+			}
+			if cmd.Flags().Changed("auth-client-id") {
+				current.AuthClientID = strings.TrimSpace(authClientID)
+			}
+			if cmd.Flags().Changed("access-token-ref") {
+				current.AccessTokenRef = strings.TrimSpace(accessTokenRef)
+			}
+			if cmd.Flags().Changed("refresh-token-ref") {
+				current.RefreshTokenRef = strings.TrimSpace(refreshTokenRef)
 			}
 
 			cfg.UpsertProfile(profile, current)
@@ -155,6 +150,11 @@ func newConfigSetCommand(app *App) *cobra.Command {
 	cmd.Flags().StringVar(&environment, "environment", "", "Default environment")
 	cmd.Flags().StringVar(&apiKeyRef, "api-key-ref", "", "Secret reference for API key")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key value to store under --api-key-ref")
+	cmd.Flags().StringVar(&authIssuer, "auth-issuer", "", "Auth issuer URL")
+	cmd.Flags().StringVar(&authAudience, "auth-audience", "", "Auth audience")
+	cmd.Flags().StringVar(&authClientID, "auth-client-id", "", "Auth client ID")
+	cmd.Flags().StringVar(&accessTokenRef, "access-token-ref", "", "Secret reference for browser access token")
+	cmd.Flags().StringVar(&refreshTokenRef, "refresh-token-ref", "", "Secret reference for browser refresh token")
 
 	return cmd
 }
@@ -200,11 +200,15 @@ func newConfigShowCommand(app *App) *cobra.Command {
 			}
 
 			payload := map[string]any{
-				"profile":     resolved.Profile,
-				"api_url":     resolved.APIURL,
-				"project":     resolved.Project,
-				"environment": resolved.Environment,
-				"api_key_set": resolved.APIKey != "",
+				"profile":          resolved.Profile,
+				"api_url":          resolved.APIURL,
+				"project":          resolved.Project,
+				"environment":      resolved.Environment,
+				"api_key_set":      resolved.APIKey != "",
+				"access_token_set": resolved.AccessToken != "",
+				"auth_issuer":      resolved.AuthIssuer,
+				"auth_audience":    resolved.AuthAudience,
+				"auth_client_id":   resolved.AuthClientID,
 			}
 
 			if printer.JSON {
@@ -216,6 +220,10 @@ func newConfigShowCommand(app *App) *cobra.Command {
 			fmt.Printf("Project: %s\n", resolved.Project)
 			fmt.Printf("Environment: %s\n", resolved.Environment)
 			fmt.Printf("API key configured: %t\n", resolved.APIKey != "")
+			fmt.Printf("Browser session configured: %t\n", resolved.AccessToken != "")
+			fmt.Printf("Auth issuer: %s\n", valueOrDash(resolved.AuthIssuer))
+			fmt.Printf("Auth audience: %s\n", valueOrDash(resolved.AuthAudience))
+			fmt.Printf("Auth client ID: %s\n", valueOrDash(resolved.AuthClientID))
 			return nil
 		},
 	}

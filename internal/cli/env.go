@@ -8,11 +8,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newEnvCommand(app *App) *cobra.Command {
+func newEnvironmentsCommand(app *App) *cobra.Command {
 	envCmd := &cobra.Command{
-		Use:     "env",
-		Aliases: []string{"environments"},
-		Short:   "Environment operations",
+		Use:   "environments",
+		Short: "Manage project environments",
 	}
 	envCmd.AddCommand(newEnvListCommand(app))
 	envCmd.AddCommand(newEnvGetCommand(app))
@@ -355,7 +354,7 @@ func newEnvVarsListCommand(app *App) *cobra.Command {
 			if err := requireValue("project", resolved.Project); err != nil {
 				return err
 			}
-			if err := requireValue("env", resolved.Environment); err != nil {
+			if err := requireValue("environment", resolved.Environment); err != nil {
 				return err
 			}
 
@@ -389,7 +388,7 @@ func newEnvVarsListCommand(app *App) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&project, "project", "", "Project slug or id")
-	cmd.Flags().StringVar(&environment, "env", "", "Environment key or id")
+	cmd.Flags().StringVar(&environment, "environment", "", "Environment key or id")
 	return cmd
 }
 
@@ -410,7 +409,7 @@ func newEnvVarsCreateCommand(app *App) *cobra.Command {
 			if err := requireValue("project", resolved.Project); err != nil {
 				return err
 			}
-			if err := requireValue("env", resolved.Environment); err != nil {
+			if err := requireValue("environment", resolved.Environment); err != nil {
 				return err
 			}
 			if err := requireValue("name", name); err != nil {
@@ -452,7 +451,7 @@ func newEnvVarsCreateCommand(app *App) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&project, "project", "", "Project slug or id")
-	cmd.Flags().StringVar(&environment, "env", "", "Environment key or id")
+	cmd.Flags().StringVar(&environment, "environment", "", "Environment key or id")
 	cmd.Flags().StringVar(&name, "name", "", "Variable name")
 	cmd.Flags().StringVar(&value, "value", "", "Variable value")
 	cmd.Flags().StringVar(&description, "description", "", "Variable description")
@@ -477,7 +476,7 @@ func newEnvVarsUpdateCommand(app *App) *cobra.Command {
 			if err := requireValue("project", resolved.Project); err != nil {
 				return err
 			}
-			if err := requireValue("env", resolved.Environment); err != nil {
+			if err := requireValue("environment", resolved.Environment); err != nil {
 				return err
 			}
 			if err := requireValue("var", variable); err != nil {
@@ -530,7 +529,7 @@ func newEnvVarsUpdateCommand(app *App) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&project, "project", "", "Project slug or id")
-	cmd.Flags().StringVar(&environment, "env", "", "Environment key or id")
+	cmd.Flags().StringVar(&environment, "environment", "", "Environment key or id")
 	cmd.Flags().StringVar(&variable, "var", "", "Variable id or name")
 	cmd.Flags().StringVar(&name, "name", "", "Variable name")
 	cmd.Flags().StringVar(&value, "value", "", "Variable value")
@@ -557,7 +556,7 @@ func newEnvVarsDeleteCommand(app *App) *cobra.Command {
 			if err := requireValue("project", resolved.Project); err != nil {
 				return err
 			}
-			if err := requireValue("env", resolved.Environment); err != nil {
+			if err := requireValue("environment", resolved.Environment); err != nil {
 				return err
 			}
 			if err := requireValue("var", variable); err != nil {
@@ -598,7 +597,7 @@ func newEnvVarsDeleteCommand(app *App) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&project, "project", "", "Project slug or id")
-	cmd.Flags().StringVar(&environment, "env", "", "Environment key or id")
+	cmd.Flags().StringVar(&environment, "environment", "", "Environment key or id")
 	cmd.Flags().StringVar(&variable, "var", "", "Variable id or name")
 	cmd.Flags().BoolVar(&yes, "yes", false, "Confirm deletion")
 	return cmd

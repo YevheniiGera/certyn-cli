@@ -445,7 +445,15 @@ func newExecutionsConversationCommand(app *App) *cobra.Command {
 	return cmd
 }
 
+func newDiagnoseCommand(app *App) *cobra.Command {
+	return newDiagnoseExecutionCommand(app)
+}
+
 func newExecutionsDiagnoseCommand(app *App) *cobra.Command {
+	return newDiagnoseExecutionCommand(app)
+}
+
+func newDiagnoseExecutionCommand(app *App) *cobra.Command {
 	var project string
 	var before string
 	var page int

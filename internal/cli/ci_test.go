@@ -90,7 +90,7 @@ func TestCIWaitJSONSuccessEmitsStatusPayload(t *testing.T) {
 	}))
 	defer server.Close()
 
-	stdout, _, err := executeRootCommand(t, []string{"--json", "ci", "wait", "run-success", "--timeout", "2s"}, map[string]string{
+	stdout, _, err := executeRootCommand(t, []string{"--json", "run", "wait", "run-success", "--timeout", "2s"}, map[string]string{
 		"CERTYN_API_URL":     server.URL,
 		"CERTYN_API_KEY":     "test-key",
 		"XDG_CONFIG_HOME":    t.TempDir(),
@@ -135,7 +135,7 @@ func TestCIWaitJSONTimeoutEmitsFailurePayload(t *testing.T) {
 	}))
 	defer server.Close()
 
-	stdout, _, err := executeRootCommand(t, []string{"--json", "ci", "wait", "run-timeout", "--timeout", "50ms"}, map[string]string{
+	stdout, _, err := executeRootCommand(t, []string{"--json", "run", "wait", "run-timeout", "--timeout", "50ms"}, map[string]string{
 		"CERTYN_API_URL":  server.URL,
 		"CERTYN_API_KEY":  "test-key",
 		"XDG_CONFIG_HOME": t.TempDir(),
@@ -187,7 +187,7 @@ func TestCIListSlugFallbackIgnoresAuthErrorAfterEmptyResult(t *testing.T) {
 	}))
 	defer server.Close()
 
-	stdout, _, err := executeRootCommand(t, []string{"--json", "ci", "list", "--project", "my-slug"}, map[string]string{
+	stdout, _, err := executeRootCommand(t, []string{"--json", "run", "list", "--project", "my-slug"}, map[string]string{
 		"CERTYN_API_URL":  server.URL,
 		"CERTYN_API_KEY":  "test-key",
 		"XDG_CONFIG_HOME": t.TempDir(),

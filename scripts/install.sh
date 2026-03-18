@@ -190,6 +190,10 @@ log "Installed certyn to ${INSTALL_DIR}/certyn"
 if "${INSTALL_DIR}/certyn" --version >/dev/null 2>&1; then
   "${INSTALL_DIR}/certyn" --version
 fi
+log ""
+log "Next steps:"
+log "  Local machine: ${INSTALL_DIR}/certyn login"
+log "  CI/agents: set CERTYN_API_KEY and run ${INSTALL_DIR}/certyn ci run ..."
 
 # Install Claude Code skill (if skill files are in the archive)
 SKILL_SRC="$(find "$TMP_DIR" -maxdepth 3 -type d -name 'skills' | head -n1 || true)"

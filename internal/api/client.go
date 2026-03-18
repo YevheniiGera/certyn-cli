@@ -16,10 +16,11 @@ import (
 )
 
 type Client struct {
-	httpClient *http.Client
-	baseURL    string
-	apiKey     string
-	userAgent  string
+	httpClient  *http.Client
+	baseURL     string
+	apiKey      string
+	accessToken string
+	userAgent   string
 }
 
 type APIError struct {
@@ -44,6 +45,10 @@ func NewClient(baseURL, apiKey string) *Client {
 		apiKey:     apiKey,
 		userAgent:  "certyn-cli/dev",
 	}
+}
+
+func (c *Client) SetAccessToken(token string) {
+	c.accessToken = strings.TrimSpace(token)
 }
 
 func (c *Client) SetUserAgent(ua string) {
@@ -713,8 +718,8 @@ func (c *Client) AskAdvisor(ctx context.Context, request AskAdvisorRequest) (*Ch
 }
 
 func (c *Client) doJSON(ctx context.Context, method, endpoint string, body any, into any, headers map[string]string) error {
-	if c.apiKey == "" {
-		return errors.New("api key is required")
+	if c.apiKey == "" && c.accessToken == "" {
+		return errors.New("authentication is required")
 	}
 
 	u, err := url.Parse(c.baseURL)
@@ -745,7 +750,11 @@ func (c *Client) doJSON(ctx context.Context, method, endpoint string, body any, 
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-API-Key", c.apiKey)
+	if c.accessToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.accessToken)
+	} else if c.apiKey != "" {
+		req.Header.Set("X-API-Key", c.apiKey)
+	}
 	req.Header.Set("User-Agent", c.userAgent)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
