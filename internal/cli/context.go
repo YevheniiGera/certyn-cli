@@ -45,10 +45,11 @@ func (a *App) ResolveRuntime(overrides config.ResolveInput, requireAPIKey bool) 
 		return config.Runtime{}, nil, output.Printer{}, err
 	}
 
+	explicitAPIKey := firstNonEmpty(overrides.APIKey, a.flags.APIKey)
 	resolved, err := a.cfg.Resolve(config.ResolveInput{
 		Profile:     firstNonEmpty(overrides.Profile, a.flags.Profile),
 		APIURL:      firstNonEmpty(overrides.APIURL, a.flags.APIURL),
-		APIKey:      firstNonEmpty(overrides.APIKey, a.flags.APIKey),
+		APIKey:      explicitAPIKey,
 		Project:     firstNonEmpty(overrides.Project, a.flags.Project),
 		Environment: firstNonEmpty(overrides.Environment, a.flags.Environment),
 	})
@@ -56,7 +57,11 @@ func (a *App) ResolveRuntime(overrides config.ResolveInput, requireAPIKey bool) 
 		return config.Runtime{}, nil, output.Printer{}, usageError("failed to resolve runtime config", err)
 	}
 
-	if strings.TrimSpace(resolved.AccessToken) != "" {
+	if strings.TrimSpace(explicitAPIKey) != "" {
+		resolved.APIKey = strings.TrimSpace(explicitAPIKey)
+		resolved.AccessToken = ""
+		resolved.RefreshToken = ""
+	} else if strings.TrimSpace(resolved.AccessToken) != "" {
 		refreshed, refreshErr := a.refreshSessionIfNeeded(resolved)
 		if refreshErr != nil {
 			return config.Runtime{}, nil, output.Printer{}, refreshErr

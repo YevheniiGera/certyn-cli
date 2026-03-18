@@ -60,7 +60,7 @@ certyn executions conversation --project <slug> <execution-id>
 
 ```bash
 certyn ask --project <slug> "Why did checkout fail after login?"
-certyn ask "What should I check next?" --context "verify failed with network_401 on /api/checkout"
+certyn ask --project <slug> "What should I check next?" --context "verify failed with network_401 on /api/checkout"
 ```
 
 ### Manage environments and projects

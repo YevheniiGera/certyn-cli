@@ -41,6 +41,30 @@ func resolveProjectID(ctx context.Context, client *api.Client, identifier string
 	return id, err
 }
 
+func resolveDefaultProjectID(ctx context.Context, client *api.Client) (string, string, error) {
+	overview, err := client.GetProjectsOverview(ctx)
+	if err != nil {
+		return "", "", classifyAPIError(err, "failed to fetch projects overview")
+	}
+
+	defaultID := strings.TrimSpace(overview.DefaultProjectID)
+	if defaultID != "" {
+		for _, project := range overview.Projects {
+			if strings.EqualFold(strings.TrimSpace(project.ID), defaultID) {
+				return strings.TrimSpace(project.ID), strings.TrimSpace(project.Slug), nil
+			}
+		}
+		return defaultID, "", nil
+	}
+
+	if len(overview.Projects) == 1 {
+		project := overview.Projects[0]
+		return strings.TrimSpace(project.ID), strings.TrimSpace(project.Slug), nil
+	}
+
+	return "", "", usageError("advisor requires project context; pass --project or configure a default project", nil)
+}
+
 func resolveProjectRouteIDFromConfig(app *App, identifier, profileOverride string) (string, error) {
 	needle := strings.TrimSpace(identifier)
 	if needle == "" {

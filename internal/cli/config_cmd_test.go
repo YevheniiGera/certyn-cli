@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -189,6 +191,58 @@ func TestConfigSetProjectResolvesAndStoresMapping(t *testing.T) {
 	}
 	if getPayload["id"] != projectID {
 		t.Fatalf("expected mapped id %s, got %#v", projectID, getPayload["id"])
+	}
+}
+
+func TestConfigShowExplicitAPIKeyOverridesStoredAccessToken(t *testing.T) {
+	configDir := t.TempDir()
+	configPath := filepath.Join(configDir, "certyn", "config.yaml")
+	secretsPath := filepath.Join(configDir, "certyn", "secrets.yaml")
+
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o700); err != nil {
+		t.Fatalf("create config dir: %v", err)
+	}
+
+	configBody := `active_profile: dev
+profiles:
+  default: {}
+  dev:
+    api_url: https://api.certyn.io/api
+    access_token_ref: dev_access_token
+`
+	if err := os.WriteFile(configPath, []byte(configBody), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	secretsBody := `secrets:
+  dev_access_token: expired.invalid.token
+`
+	if err := os.WriteFile(secretsPath, []byte(secretsBody), 0o600); err != nil {
+		t.Fatalf("write secrets: %v", err)
+	}
+
+	out, _, err := executeRootCommand(t, []string{
+		"--json",
+		"--profile", "dev",
+		"--api-key", "explicit-key",
+		"config", "show",
+	}, map[string]string{
+		"XDG_CONFIG_HOME": configDir,
+	})
+	if err != nil {
+		t.Fatalf("config show failed: %v", err)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("parse config show JSON: %v\noutput: %s", err, out)
+	}
+
+	if apiKeySet, ok := payload["api_key_set"].(bool); !ok || !apiKeySet {
+		t.Fatalf("expected api_key_set=true, got %#v", payload["api_key_set"])
+	}
+	if accessTokenSet, ok := payload["access_token_set"].(bool); !ok || accessTokenSet {
+		t.Fatalf("expected access_token_set=false with explicit --api-key, got %#v", payload["access_token_set"])
 	}
 }
 

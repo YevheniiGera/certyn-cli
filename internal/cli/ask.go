@@ -83,8 +83,8 @@ func newAskCommand(app *App) *cobra.Command {
 
 	cmd.Flags().StringVar(&project, "project", "", "Project slug or id")
 	cmd.Flags().StringVar(&extraContext, "context", "", "Additional context appended to the question")
-	cmd.Flags().IntVar(&maxToolIterations, "max-tool-iterations", 4, "Maximum tool iterations for advisor mode")
-	cmd.Flags().IntVar(&maxOutputTokens, "max-output-tokens", 800, "Maximum output token count for advisor mode")
+	cmd.Flags().IntVar(&maxToolIterations, "max-tool-iterations", 10, "Maximum tool iterations for advisor mode")
+	cmd.Flags().IntVar(&maxOutputTokens, "max-output-tokens", 4096, "Maximum output token count for advisor mode")
 
 	return cmd
 }
@@ -137,17 +137,34 @@ func runAsk(
 					applyAskError(&result, runErr, ExitUsage)
 					return result, runErr
 				}
-				result.Warnings = append(
-					result.Warnings,
+				runErr = usageError(
 					fmt.Sprintf(
-						"could not resolve configured project '%s': %s; continuing without project context",
+						"project context is required for advisor mode; could not resolve project '%s'. update your config or pass --project",
 						projectInput,
-						err.Error(),
 					),
+					err,
 				)
+				applyAskError(&result, runErr, ExitUsage)
+				return result, runErr
 			} else {
 				projectID = resolvedProjectID
 			}
+		}
+	} else {
+		defaultProjectID, defaultProjectSlug, err := resolveDefaultProjectID(ctx, client)
+		if err != nil {
+			runErr = err
+			applyAskError(&result, runErr, ExitUsage)
+			return result, runErr
+		}
+		projectID = defaultProjectID
+		if defaultProjectSlug != "" {
+			result.Warnings = append(
+				result.Warnings,
+				fmt.Sprintf("using default project '%s' for advisor mode", defaultProjectSlug),
+			)
+		} else {
+			result.Warnings = append(result.Warnings, "using account default project for advisor mode")
 		}
 	}
 

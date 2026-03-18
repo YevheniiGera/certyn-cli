@@ -48,7 +48,7 @@ certyn config use ci
 ## Core Workflow
 
 ```bash
-certyn ask "What should I check before changing the login flow?"
+certyn ask --project my-app "What should I check before changing the login flow?"
 
 certyn login
 certyn whoami

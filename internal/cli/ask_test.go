@@ -100,23 +100,29 @@ func TestAskJSONSuccessWithoutProject(t *testing.T) {
 	var advisorPayload map[string]any
 
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/chat/advisor" {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/projects/overview":
+			_, _ = io.WriteString(w, `{"defaultProjectId":"`+verifyProjectID+`","projects":[{"id":"`+verifyProjectID+`","slug":"my-project","name":"My Project"}]}`)
+			return
+		case r.Method == http.MethodPost && r.URL.Path == "/api/chat/advisor":
+			var err error
+			advisorPayload, err = decodeJSONMap(r.Body)
+			if err != nil {
+				t.Fatalf("decode advisor payload: %v", err)
+			}
+			_, _ = io.WriteString(w, `{
+				"conversationId":"advisor-2",
+				"messageId":"msg-2",
+				"content":"Start with smoke-suite and check execution diagnostics.",
+				"role":"assistant",
+				"toolCalls":[],
+				"createdAt":"2026-02-23T09:10:00Z"
+			}`)
+			return
+		default:
 			http.NotFound(w, r)
 			return
 		}
-		var err error
-		advisorPayload, err = decodeJSONMap(r.Body)
-		if err != nil {
-			t.Fatalf("decode advisor payload: %v", err)
-		}
-		_, _ = io.WriteString(w, `{
-			"conversationId":"advisor-2",
-			"messageId":"msg-2",
-			"content":"Start with smoke-suite and check execution diagnostics.",
-			"role":"assistant",
-			"toolCalls":[],
-			"createdAt":"2026-02-23T09:10:00Z"
-		}`)
 	}))
 	defer apiServer.Close()
 
@@ -129,16 +135,29 @@ func TestAskJSONSuccessWithoutProject(t *testing.T) {
 		t.Fatalf("ask without project should succeed, got %v", err)
 	}
 
-	if _, hasProject := advisorPayload["projectId"]; hasProject {
-		t.Fatalf("expected no projectId in advisor request, got %#v", advisorPayload["projectId"])
+	if advisorPayload["projectId"] != verifyProjectID {
+		t.Fatalf("expected default projectId=%s, got %#v", verifyProjectID, advisorPayload["projectId"])
+	}
+	if int(advisorPayload["maxToolIterations"].(float64)) != 10 {
+		t.Fatalf("expected default maxToolIterations=10, got %#v", advisorPayload["maxToolIterations"])
+	}
+	if int(advisorPayload["maxOutputTokenCount"].(float64)) != 4096 {
+		t.Fatalf("expected default maxOutputTokenCount=4096, got %#v", advisorPayload["maxOutputTokenCount"])
 	}
 
 	payload := parseAskJSONOutput(t, stdout)
-	if used, _ := payload["used_project_context"].(bool); used {
-		t.Fatalf("expected used_project_context=false, got %#v", payload["used_project_context"])
+	if used, _ := payload["used_project_context"].(bool); !used {
+		t.Fatalf("expected used_project_context=true, got %#v", payload["used_project_context"])
 	}
-	if _, hasProjectID := payload["project_id"]; hasProjectID {
-		t.Fatalf("expected no project_id output, got %#v", payload["project_id"])
+	if payload["project_id"] != verifyProjectID {
+		t.Fatalf("expected project_id=%s, got %#v", verifyProjectID, payload["project_id"])
+	}
+	warnings, ok := payload["warnings"].([]any)
+	if !ok || len(warnings) == 0 {
+		t.Fatalf("expected warning about default project, got %#v", payload["warnings"])
+	}
+	if !strings.Contains(strings.ToLower(warnings[0].(string)), "using default project") {
+		t.Fatalf("expected default project warning, got %#v", warnings[0])
 	}
 	if code := int(payload["exit_code"].(float64)); code != ExitOK {
 		t.Fatalf("expected exit_code=%d, got %d", ExitOK, code)
@@ -202,11 +221,14 @@ func TestAskExplicitInvalidProjectFails(t *testing.T) {
 
 func TestAskAuthFailureReturnsExitAuth(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/chat/advisor" {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/projects/overview":
+			http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+			return
+		default:
 			http.NotFound(w, r)
 			return
 		}
-		http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
 	}))
 	defer apiServer.Close()
 
@@ -226,9 +248,7 @@ func TestAskAuthFailureReturnsExitAuth(t *testing.T) {
 	}
 }
 
-func TestAskImplicitStaleProjectFallsBackWithWarning(t *testing.T) {
-	var advisorPayload map[string]any
-
+func TestAskImplicitStaleProjectFails(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/projects/overview":
@@ -238,19 +258,7 @@ func TestAskImplicitStaleProjectFallsBackWithWarning(t *testing.T) {
 			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 			return
 		case r.Method == http.MethodPost && r.URL.Path == "/api/chat/advisor":
-			var err error
-			advisorPayload, err = decodeJSONMap(r.Body)
-			if err != nil {
-				t.Fatalf("decode advisor payload: %v", err)
-			}
-			_, _ = io.WriteString(w, `{
-				"conversationId":"advisor-3",
-				"messageId":"msg-3",
-				"content":"Check failing execution diagnostics first.",
-				"role":"assistant",
-				"toolCalls":[],
-				"createdAt":"2026-02-23T09:20:00Z"
-			}`)
+			t.Fatal("advisor endpoint should not be called when configured project resolution fails")
 			return
 		default:
 			http.NotFound(w, r)
@@ -267,27 +275,20 @@ func TestAskImplicitStaleProjectFallsBackWithWarning(t *testing.T) {
 		"ask",
 		"How should I continue?",
 	}, env)
-	if err != nil {
-		t.Fatalf("expected ask success with implicit stale project fallback, got %v", err)
+	if err == nil {
+		t.Fatal("expected ask to fail with stale configured project")
 	}
-
-	if _, hasProject := advisorPayload["projectId"]; hasProject {
-		t.Fatalf("expected advisor request without projectId, got %#v", advisorPayload["projectId"])
-	}
+	assertCommandErrorCode(t, err, ExitUsage)
 
 	payload := parseAskJSONOutput(t, stdout)
 	if payload["project_input"] != "stale-project" {
 		t.Fatalf("expected project_input=stale-project, got %#v", payload["project_input"])
 	}
-	if used, _ := payload["used_project_context"].(bool); used {
-		t.Fatalf("expected used_project_context=false, got %#v", payload["used_project_context"])
+	if code := int(payload["exit_code"].(float64)); code != ExitUsage {
+		t.Fatalf("expected exit_code=%d, got %d", ExitUsage, code)
 	}
-	warnings, ok := payload["warnings"].([]any)
-	if !ok || len(warnings) == 0 {
-		t.Fatalf("expected non-empty warnings, got %#v", payload["warnings"])
-	}
-	if !strings.Contains(strings.ToLower(warnings[0].(string)), "continuing without project context") {
-		t.Fatalf("expected fallback warning text, got %#v", warnings[0])
+	if !strings.Contains(strings.ToLower(payload["error"].(string)), "project context is required") {
+		t.Fatalf("expected project context error, got %#v", payload["error"])
 	}
 }
 
