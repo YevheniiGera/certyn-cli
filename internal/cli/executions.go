@@ -9,6 +9,7 @@ import (
 
 	"github.com/certyn/certyn-cli/internal/api"
 	"github.com/certyn/certyn-cli/internal/config"
+	"github.com/certyn/certyn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -87,9 +88,8 @@ func newExecutionsListCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(resp)
 			}
 
-			fmt.Printf("Executions: %d\n", resp.TotalCount)
-			fmt.Printf("%-36s %-11s %-10s %-10s %-36s %s\n",
-				"ID", "STATUS", "OUTCOME", "DURATION", "TICKET", "TITLE")
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Executions (%d)", resp.TotalCount))
 			for _, execution := range resp.Items {
 				ticketID := valueOrDash(execution.TicketID)
 				ticketTitle := "-"
@@ -97,14 +97,14 @@ func newExecutionsListCommand(app *App) *cobra.Command {
 					ticketID = valueOrDash(execution.Ticket.ID)
 					ticketTitle = valueOrDash(execution.Ticket.Title)
 				}
-				fmt.Printf("%-36s %-11s %-10s %-10ds %-36s %s\n",
-					execution.ID,
-					execution.Status,
-					valueOrDash(execution.EffectiveTestOutcome),
-					execution.Duration,
-					ticketID,
+				printHumanItem(st, humanKVSummary(
+					st.Status(execution.Status),
+					st.Status(valueOrDash(execution.EffectiveTestOutcome)),
+					fmt.Sprintf("%ds", execution.Duration),
 					ticketTitle,
-				)
+				))
+				printHumanField(st, "id", execution.ID)
+				printHumanField(st, "ticket", ticketID)
 			}
 			return nil
 		},
@@ -148,13 +148,15 @@ func newExecutionsGetCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(execution)
 			}
 
-			fmt.Printf("Execution %s\n", execution.ID)
-			fmt.Printf("Ticket: %s\n", valueOrDash(execution.TicketID))
-			fmt.Printf("Status: %s\n", execution.Status)
-			fmt.Printf("Trigger type: %s\n", execution.TriggerType)
-			fmt.Printf("Started at: %s\n", timeStringOrDash(execution.StartedAt))
-			fmt.Printf("Completed at: %s\n", timeStringOrDash(execution.CompletedAt))
-			fmt.Printf("Summary available: %t\n", execution.SummaryMarkdown != nil && strings.TrimSpace(*execution.SummaryMarkdown) != "")
+			st := output.NewStyler()
+			printHumanHeader(st, "info", "Execution")
+			printHumanField(st, "id", execution.ID)
+			printHumanField(st, "ticket", valueOrDash(execution.TicketID))
+			printHumanField(st, "status", st.Status(execution.Status))
+			printHumanField(st, "trigger", execution.TriggerType)
+			printHumanField(st, "started", timeStringOrDash(execution.StartedAt))
+			printHumanField(st, "completed", timeStringOrDash(execution.CompletedAt))
+			printHumanField(st, "summary", humanBool(st, execution.SummaryMarkdown != nil && strings.TrimSpace(*execution.SummaryMarkdown) != ""))
 			return nil
 		},
 	}
@@ -193,14 +195,15 @@ func newExecutionsForIssueCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(resp)
 			}
 
-			fmt.Printf("Executions for issue %s: %d\n", strings.TrimSpace(args[0]), resp.TotalCount)
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Executions for issue %s (%d)", strings.TrimSpace(args[0]), resp.TotalCount))
 			for _, execution := range resp.Items {
-				fmt.Printf("- %s status=%s startedAt=%s completedAt=%s\n",
+				printHumanItem(st, humanKVSummary(
 					execution.ID,
-					execution.Status,
-					timeStringOrDash(execution.StartedAt),
-					timeStringOrDash(execution.CompletedAt),
-				)
+					st.Status(execution.Status),
+					"started "+timeStringOrDash(execution.StartedAt),
+					"completed "+timeStringOrDash(execution.CompletedAt),
+				))
 			}
 			return nil
 		},

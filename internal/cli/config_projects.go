@@ -63,11 +63,10 @@ func newConfigProjectsMapCommand(app *App) *cobra.Command {
 					"mapped":  true,
 				})
 			}
-			fmt.Printf("Mapped project slug '%s' -> '%s' in profile '%s'\n",
-				strings.TrimSpace(strings.ToLower(slug)),
-				strings.TrimSpace(id),
-				resolved.Profile,
-			)
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Project mapping saved")
+			printHumanField(st, "profile", resolved.Profile)
+			printHumanField(st, "mapping", strings.TrimSpace(strings.ToLower(slug))+" -> "+strings.TrimSpace(id))
 			return nil
 		},
 	}
@@ -112,10 +111,10 @@ func newConfigProjectsUnmapCommand(app *App) *cobra.Command {
 					"removed": true,
 				})
 			}
-			fmt.Printf("Removed mapping for slug '%s' in profile '%s'\n",
-				strings.TrimSpace(strings.ToLower(slug)),
-				resolved.Profile,
-			)
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Project mapping removed")
+			printHumanField(st, "profile", resolved.Profile)
+			printHumanField(st, "slug", strings.TrimSpace(strings.ToLower(slug)))
 			return nil
 		},
 	}
@@ -150,13 +149,15 @@ func newConfigProjectsListCommand(app *App) *cobra.Command {
 				})
 			}
 
+			st := output.NewStyler()
 			slugs := make([]string, 0, len(mappings))
 			for slug := range mappings {
 				slugs = append(slugs, slug)
 			}
 			sort.Strings(slugs)
+			printHumanHeader(st, "info", fmt.Sprintf("Project mappings (%d)", len(slugs)))
 			for _, slug := range slugs {
-				fmt.Printf("%s -> %s\n", slug, mappings[slug])
+				printHumanItem(st, slug+" -> "+mappings[slug])
 			}
 			return nil
 		},
@@ -204,7 +205,10 @@ func newConfigProjectsGetCommand(app *App) *cobra.Command {
 				})
 			}
 
-			fmt.Printf("%s -> %s\n", strings.TrimSpace(strings.ToLower(slug)), id)
+			st := output.NewStyler()
+			printHumanHeader(st, "info", "Project mapping")
+			printHumanField(st, "profile", resolved.Profile)
+			printHumanField(st, "mapping", strings.TrimSpace(strings.ToLower(slug))+" -> "+id)
 			return nil
 		},
 	}

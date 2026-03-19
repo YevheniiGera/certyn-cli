@@ -105,16 +105,16 @@ func newLoginCommand(app *App) *cobra.Command {
 			claims, _ := parseAuthTokenClaims(tokenSet.AccessToken)
 			printer := output.Printer{JSON: app.flags.JSON}
 			payload := map[string]any{
-				"profile":     profileName,
-				"issuer":      current.AuthIssuer,
-				"audience":    current.AuthAudience,
-				"subject":     claims.Subject,
-				"email":       claims.Email,
-				"name":        claims.Name,
-				"logged_in":   true,
-				"next_step":   "certyn whoami",
-				"opened_url":  firstNonEmpty(deviceCode.VerificationURIComplete, deviceCode.VerificationURI),
-				"user_code":   deviceCode.UserCode,
+				"profile":    profileName,
+				"issuer":     current.AuthIssuer,
+				"audience":   current.AuthAudience,
+				"subject":    claims.Subject,
+				"email":      claims.Email,
+				"name":       claims.Name,
+				"logged_in":  true,
+				"next_step":  "certyn whoami",
+				"opened_url": firstNonEmpty(deviceCode.VerificationURIComplete, deviceCode.VerificationURI),
+				"user_code":  deviceCode.UserCode,
 			}
 			if printer.JSON {
 				return printer.EmitJSON(payload)
@@ -189,12 +189,12 @@ func newWhoAmICommand(app *App) *cobra.Command {
 			}
 
 			payload := map[string]any{
-				"profile":      resolved.Profile,
-				"api_url":      resolved.APIURL,
-				"project":      resolved.Project,
-				"environment":  resolved.Environment,
-				"auth_mode":    "api_key",
-				"auth_issuer":  resolved.AuthIssuer,
+				"profile":       resolved.Profile,
+				"api_url":       resolved.APIURL,
+				"project":       resolved.Project,
+				"environment":   resolved.Environment,
+				"auth_mode":     "api_key",
+				"auth_issuer":   resolved.AuthIssuer,
 				"auth_audience": resolved.AuthAudience,
 			}
 
@@ -215,19 +215,21 @@ func newWhoAmICommand(app *App) *cobra.Command {
 				return printer.EmitJSON(payload)
 			}
 
-			fmt.Printf("Profile: %s\n", resolved.Profile)
-			fmt.Printf("Auth mode: %s\n", payload["auth_mode"])
-			fmt.Printf("API URL: %s\n", resolved.APIURL)
-			fmt.Printf("Project: %s\n", valueOrDash(resolved.Project))
-			fmt.Printf("Environment: %s\n", valueOrDash(resolved.Environment))
+			st := output.NewStyler()
+			printHumanHeader(st, "info", "Active identity")
+			printHumanField(st, "profile", resolved.Profile)
+			printHumanField(st, "auth mode", fmt.Sprintf("%v", payload["auth_mode"]))
+			printHumanField(st, "api url", resolved.APIURL)
+			printHumanField(st, "project", valueOrDash(resolved.Project))
+			printHumanField(st, "environment", valueOrDash(resolved.Environment))
 			if subject, ok := payload["subject"].(string); ok && subject != "" {
-				fmt.Printf("Subject: %s\n", subject)
+				printHumanField(st, "subject", subject)
 			}
 			if email, ok := payload["email"].(string); ok && email != "" {
-				fmt.Printf("Email: %s\n", email)
+				printHumanField(st, "email", email)
 			}
 			if name, ok := payload["name"].(string); ok && name != "" {
-				fmt.Printf("Name: %s\n", name)
+				printHumanField(st, "name", name)
 			}
 			return nil
 		},
@@ -292,22 +294,24 @@ func newDoctorCommand(app *App) *cobra.Command {
 			}
 
 			payload := map[string]any{
-				"profile":      resolved.Profile,
-				"api_url":      resolved.APIURL,
-				"project":      resolved.Project,
-				"environment":  resolved.Environment,
-				"checks":       checks,
+				"profile":     resolved.Profile,
+				"api_url":     resolved.APIURL,
+				"project":     resolved.Project,
+				"environment": resolved.Environment,
+				"checks":      checks,
 			}
 			if printer.JSON {
 				return printer.EmitJSON(payload)
 			}
 
+			st := output.NewStyler()
+			printHumanHeader(st, "info", "Doctor")
 			for _, check := range checks {
-				status := "ok"
+				kind := "ok"
 				if passed, _ := check["ok"].(bool); !passed {
-					status = "fail"
+					kind = "fail"
 				}
-				fmt.Printf("[%s] %s: %s\n", status, check["name"], check["detail"])
+				fmt.Printf("%s %s: %s\n", st.Badge(kind), check["name"], check["detail"])
 			}
 			return nil
 		},

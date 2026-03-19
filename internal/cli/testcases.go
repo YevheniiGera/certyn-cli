@@ -7,6 +7,7 @@ import (
 
 	"github.com/certyn/certyn-cli/internal/api"
 	"github.com/certyn/certyn-cli/internal/config"
+	"github.com/certyn/certyn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -72,17 +73,16 @@ func newTestcasesListCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(resp)
 			}
 
-			fmt.Printf("Test cases: %d\n", resp.TotalCount)
-			fmt.Printf("%-36s %-6s %-12s %-14s %s\n",
-				"ID", "NUM", "QUARANTINED", "NEEDS_REVIEW", "NAME")
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Tests (%d)", resp.TotalCount))
 			for _, tc := range resp.Items {
-				fmt.Printf("%-36s %-6d %-12t %-14t %s\n",
-					tc.ID,
-					tc.Number,
-					tc.IsQuarantined,
-					tc.NeedsReview,
+				printHumanItem(st, humanKVSummary(
+					fmt.Sprintf("#%d", tc.Number),
 					tc.Name,
-				)
+				))
+				printHumanField(st, "id", tc.ID)
+				printHumanField(st, "quarantined", humanBool(st, tc.IsQuarantined))
+				printHumanField(st, "needs review", humanBool(st, tc.NeedsReview))
 			}
 			return nil
 		},
@@ -125,13 +125,14 @@ func newTestcasesGetCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(tc)
 			}
 
-			fmt.Printf("Test case %s\n", tc.ID)
-			fmt.Printf("Number: %d\n", tc.Number)
-			fmt.Printf("Name: %s\n", tc.Name)
-			fmt.Printf("Description: %s\n", ptrStringOrDash(tc.Description))
-			fmt.Printf("Quarantined: %t\n", tc.IsQuarantined)
-			fmt.Printf("Needs review: %t\n", tc.NeedsReview)
-			fmt.Printf("Minimum env version: %s\n", ptrStringOrDash(tc.MinimumSupportedEnvironmentVersion))
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Test #%d", tc.Number))
+			printHumanField(st, "id", tc.ID)
+			printHumanField(st, "name", tc.Name)
+			printHumanField(st, "description", ptrStringOrDash(tc.Description))
+			printHumanField(st, "quarantined", humanBool(st, tc.IsQuarantined))
+			printHumanField(st, "needs review", humanBool(st, tc.NeedsReview))
+			printHumanField(st, "min env", ptrStringOrDash(tc.MinimumSupportedEnvironmentVersion))
 			return nil
 		},
 	}
@@ -169,20 +170,19 @@ func newTestcasesOverviewCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(resp)
 			}
 
-			fmt.Printf("Test case overview: %d\n", resp.TotalCount)
-			fmt.Printf("%-36s %-6s %-12s %-11s %-10s %-10s %-13s %s\n",
-				"ID", "NUM", "QUARANTINED", "NEEDS_REVIEW", "PASS_RATE", "FLAKINESS", "ACTIVE_TICKETS", "NAME")
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Test overview (%d)", resp.TotalCount))
 			for _, tc := range resp.Items {
-				fmt.Printf("%-36s %-6d %-12t %-11t %-10.2f %-10.2f %-13d %s\n",
-					tc.ID,
-					tc.Number,
-					tc.IsQuarantined,
-					tc.NeedsReview,
-					tc.PassRate,
-					tc.FlakinessRate,
-					tc.ActiveTickets,
+				printHumanItem(st, humanKVSummary(
+					fmt.Sprintf("#%d", tc.Number),
 					tc.Name,
-				)
+					fmt.Sprintf("pass %.2f", tc.PassRate),
+					fmt.Sprintf("flaky %.2f", tc.FlakinessRate),
+				))
+				printHumanField(st, "id", tc.ID)
+				printHumanField(st, "active tickets", fmt.Sprintf("%d", tc.ActiveTickets))
+				printHumanField(st, "quarantined", humanBool(st, tc.IsQuarantined))
+				printHumanField(st, "needs review", humanBool(st, tc.NeedsReview))
 			}
 			return nil
 		},
@@ -223,12 +223,14 @@ func newTestcasesReportCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(report)
 			}
 
-			fmt.Printf("Test case report: %s\n", report.TestCase.ID)
-			fmt.Printf("Name: %s\n", report.TestCase.Name)
-			fmt.Printf("Pass rate: %.2f\n", report.PassRate)
-			fmt.Printf("Flakiness: %.2f\n", report.FlakinessRate)
-			fmt.Printf("Total runs: %d (passed=%d failed=%d)\n", report.TotalRuns, report.PassedRuns, report.FailedRuns)
-			fmt.Printf("Active tickets: %d\n", report.ActiveTickets)
+			st := output.NewStyler()
+			printHumanHeader(st, "info", "Test report")
+			printHumanField(st, "id", report.TestCase.ID)
+			printHumanField(st, "name", report.TestCase.Name)
+			printHumanField(st, "pass rate", fmt.Sprintf("%.2f", report.PassRate))
+			printHumanField(st, "flakiness", fmt.Sprintf("%.2f", report.FlakinessRate))
+			printHumanField(st, "runs", fmt.Sprintf("%d total, %d passed, %d failed", report.TotalRuns, report.PassedRuns, report.FailedRuns))
+			printHumanField(st, "active tickets", fmt.Sprintf("%d", report.ActiveTickets))
 			return nil
 		},
 	}
@@ -265,17 +267,19 @@ func newTestcasesFlakinessCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(flakiness)
 			}
 
-			fmt.Printf("Test case: %s\n", flakiness.TestCaseID)
-			fmt.Printf("Flakiness score: %.2f\n", flakiness.FlakinessScore)
-			fmt.Printf("Total runs: %d (passed=%d failed=%d flips=%d)\n",
+			st := output.NewStyler()
+			printHumanHeader(st, "info", "Flakiness")
+			printHumanField(st, "test", flakiness.TestCaseID)
+			printHumanField(st, "score", fmt.Sprintf("%.2f", flakiness.FlakinessScore))
+			printHumanField(st, "runs", fmt.Sprintf("%d total, %d passed, %d failed, %d flips",
 				flakiness.TotalRuns,
 				flakiness.PassedRuns,
 				flakiness.FailedRuns,
 				flakiness.FlipCount,
-			)
-			fmt.Printf("Quarantined: %t\n", flakiness.IsQuarantined)
-			fmt.Printf("Should quarantine: %t\n", flakiness.ShouldQuarantine)
-			fmt.Printf("Last run at: %s\n", timeStringOrDash(flakiness.LastRunAt))
+			))
+			printHumanField(st, "quarantined", humanBool(st, flakiness.IsQuarantined))
+			printHumanField(st, "should quar", humanBool(st, flakiness.ShouldQuarantine))
+			printHumanField(st, "last run", timeStringOrDash(flakiness.LastRunAt))
 			return nil
 		},
 	}
@@ -312,17 +316,17 @@ func newTestcasesFlakyCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(items)
 			}
 
-			fmt.Printf("Flaky test cases: %d (threshold=%.2f)\n", len(items), threshold)
-			fmt.Printf("%-36s %-10s %-10s %-13s %s\n",
-				"TESTCASE_ID", "FLAKINESS", "QUARANTINED", "SHOULD_QUAR", "LAST_RUN_AT")
+			st := output.NewStyler()
+			printHumanHeader(st, "warn", fmt.Sprintf("Flaky tests (%d)", len(items)))
+			printHumanField(st, "threshold", fmt.Sprintf("%.2f", threshold))
 			for _, item := range items {
-				fmt.Printf("%-36s %-10.2f %-10t %-13t %s\n",
+				printHumanItem(st, humanKVSummary(
 					item.TestCaseID,
-					item.FlakinessScore,
-					item.IsQuarantined,
-					item.ShouldQuarantine,
-					timeStringOrDash(item.LastRunAt),
-				)
+					fmt.Sprintf("score %.2f", item.FlakinessScore),
+					"last run "+timeStringOrDash(item.LastRunAt),
+				))
+				printHumanField(st, "quarantined", humanBool(st, item.IsQuarantined))
+				printHumanField(st, "should quar", humanBool(st, item.ShouldQuarantine))
 			}
 			return nil
 		},

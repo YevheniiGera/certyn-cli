@@ -139,7 +139,9 @@ func newConfigSetCommand(app *App) *cobra.Command {
 					"updated": true,
 				})
 			}
-			fmt.Printf("Profile '%s' updated\n", profile)
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Profile updated")
+			printHumanField(st, "profile", profile)
 			return nil
 		},
 	}
@@ -182,7 +184,9 @@ func newConfigUseCommand(app *App) *cobra.Command {
 					"updated":        true,
 				})
 			}
-			fmt.Printf("Active profile set to '%s'\n", args[0])
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Active profile updated")
+			printHumanField(st, "profile", args[0])
 			return nil
 		},
 	}
@@ -215,15 +219,17 @@ func newConfigShowCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(payload)
 			}
 
-			fmt.Printf("Profile: %s\n", resolved.Profile)
-			fmt.Printf("API URL: %s\n", resolved.APIURL)
-			fmt.Printf("Project: %s\n", resolved.Project)
-			fmt.Printf("Environment: %s\n", resolved.Environment)
-			fmt.Printf("API key configured: %t\n", resolved.APIKey != "")
-			fmt.Printf("Browser session configured: %t\n", resolved.AccessToken != "")
-			fmt.Printf("Auth issuer: %s\n", valueOrDash(resolved.AuthIssuer))
-			fmt.Printf("Auth audience: %s\n", valueOrDash(resolved.AuthAudience))
-			fmt.Printf("Auth client ID: %s\n", valueOrDash(resolved.AuthClientID))
+			st := output.NewStyler()
+			printHumanHeader(st, "info", "Resolved config")
+			printHumanField(st, "profile", resolved.Profile)
+			printHumanField(st, "api url", resolved.APIURL)
+			printHumanField(st, "project", valueOrDash(resolved.Project))
+			printHumanField(st, "environment", valueOrDash(resolved.Environment))
+			printHumanField(st, "api key", humanBool(st, resolved.APIKey != ""))
+			printHumanField(st, "browser auth", humanBool(st, resolved.AccessToken != ""))
+			printHumanField(st, "auth issuer", valueOrDash(resolved.AuthIssuer))
+			printHumanField(st, "audience", valueOrDash(resolved.AuthAudience))
+			printHumanField(st, "client id", valueOrDash(resolved.AuthClientID))
 			return nil
 		},
 	}
@@ -253,12 +259,14 @@ func newConfigProfilesCommand(app *App) *cobra.Command {
 					"profiles":       names,
 				})
 			}
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Profiles (%d)", len(names)))
 			for _, name := range names {
-				activeMarker := " "
+				summary := name
 				if name == cfg.Data.ActiveProfile {
-					activeMarker = "*"
+					summary = st.Bold(name + " (active)")
 				}
-				fmt.Printf("%s %s\n", activeMarker, name)
+				printHumanItem(st, summary)
 			}
 			return nil
 		},

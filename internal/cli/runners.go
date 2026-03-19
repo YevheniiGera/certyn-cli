@@ -6,6 +6,7 @@ import (
 
 	"github.com/certyn/certyn-cli/internal/api"
 	"github.com/certyn/certyn-cli/internal/config"
+	"github.com/certyn/certyn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -48,8 +49,13 @@ func newRunnerPoolsListCommand(app *App) *cobra.Command {
 			if printer.JSON {
 				return printer.EmitJSON(pools)
 			}
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Runner pools (%d)", len(pools)))
 			for _, pool := range pools {
-				fmt.Printf("- %s name=%s kind=%s active=%t max=%d slots=%d\n", pool.ID, pool.Name, pool.PoolKind, pool.IsActive, pool.MaxRunners, pool.SlotsPerRunner)
+				printHumanItem(st, humanKVSummary(pool.Name, pool.PoolKind, fmt.Sprintf("max %d", pool.MaxRunners)))
+				printHumanField(st, "id", pool.ID)
+				printHumanField(st, "active", humanBool(st, pool.IsActive))
+				printHumanField(st, "slots", fmt.Sprintf("%d", pool.SlotsPerRunner))
 			}
 			return nil
 		},
@@ -102,7 +108,10 @@ func newRunnerPoolsCreateCommand(app *App) *cobra.Command {
 			if printer.JSON {
 				return printer.EmitJSON(pool)
 			}
-			fmt.Printf("Created runner pool %s (%s)\n", pool.ID, pool.Name)
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Runner pool created")
+			printHumanField(st, "id", pool.ID)
+			printHumanField(st, "name", pool.Name)
 			return nil
 		},
 	}
@@ -143,7 +152,9 @@ func newRunnerPoolsDeleteCommand(app *App) *cobra.Command {
 					"deleted": true,
 				})
 			}
-			fmt.Printf("Deleted runner pool %s\n", args[0])
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Runner pool deleted")
+			printHumanField(st, "pool", args[0])
 			return nil
 		},
 	}
@@ -180,10 +191,12 @@ func newRunnerTokensCreateCommand(app *App) *cobra.Command {
 			if printer.JSON {
 				return printer.EmitJSON(resp)
 			}
-			fmt.Printf("Token created for pool %s\n", resp.PoolID)
-			fmt.Printf("Mode: %s\n", resp.TokenMode)
-			fmt.Printf("Expires: %s\n", resp.ExpiresAtUTC.Format(time.RFC3339))
-			fmt.Printf("Token: %s\n", resp.Token)
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Runner token created")
+			printHumanField(st, "pool", resp.PoolID)
+			printHumanField(st, "mode", resp.TokenMode)
+			printHumanField(st, "expires", resp.ExpiresAtUTC.Format(time.RFC3339))
+			printHumanField(st, "token", resp.Token)
 			return nil
 		},
 	}
@@ -211,8 +224,12 @@ func newRunnersListCommand(app *App) *cobra.Command {
 			if printer.JSON {
 				return printer.EmitJSON(runners)
 			}
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Runners (%d)", len(runners)))
 			for _, runner := range runners {
-				fmt.Printf("- %s name=%s status=%s pool=%s slots=%d/%d\n", runner.ID, runner.Name, runner.Status, runner.PoolID, runner.AvailableSlots, runner.MaxConcurrency)
+				printHumanItem(st, humanKVSummary(runner.Name, st.Status(runner.Status), fmt.Sprintf("slots %d/%d", runner.AvailableSlots, runner.MaxConcurrency)))
+				printHumanField(st, "id", runner.ID)
+				printHumanField(st, "pool", runner.PoolID)
 			}
 			return nil
 		},
@@ -238,7 +255,9 @@ func newRunnersDrainCommand(app *App) *cobra.Command {
 					"drained":   true,
 				})
 			}
-			fmt.Printf("Runner %s set to draining\n", args[0])
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Runner draining")
+			printHumanField(st, "runner", args[0])
 			return nil
 		},
 	}
@@ -263,7 +282,9 @@ func newRunnersResumeCommand(app *App) *cobra.Command {
 					"resumed":   true,
 				})
 			}
-			fmt.Printf("Runner %s resumed\n", args[0])
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Runner resumed")
+			printHumanField(st, "runner", args[0])
 			return nil
 		},
 	}

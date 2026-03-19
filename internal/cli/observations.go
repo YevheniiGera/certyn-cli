@@ -6,6 +6,7 @@ import (
 
 	"github.com/certyn/certyn-cli/internal/api"
 	"github.com/certyn/certyn-cli/internal/config"
+	"github.com/certyn/certyn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -81,17 +82,17 @@ func newObservationsListCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(resp)
 			}
 
-			fmt.Printf("Observations: %d\n", resp.TotalCount)
-			fmt.Printf("%-36s %-6s %-12s %-12s %-12s %s\n", "ID", "NUM", "STATUS", "ENV", "VERSION", "TITLE")
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Observations (%d)", resp.TotalCount))
 			for _, observation := range resp.Items {
-				fmt.Printf("%-36s %-6d %-12s %-12s %-12s %s\n",
-					observation.ID,
-					observation.Number,
-					observation.Status,
+				printHumanItem(st, humanKVSummary(
+					fmt.Sprintf("#%d", observation.Number),
+					st.Status(observation.Status),
 					ptrStringOrDash(observation.DiscoveredInEnvironmentKey),
-					ptrStringOrDash(observation.DiscoveredInEnvironmentVersion),
 					observation.Title,
-				)
+				))
+				printHumanField(st, "id", observation.ID)
+				printHumanField(st, "version", ptrStringOrDash(observation.DiscoveredInEnvironmentVersion))
 			}
 			return nil
 		},
@@ -138,17 +139,18 @@ func newObservationsGetCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(observation)
 			}
 
-			fmt.Printf("Observation %s\n", observation.ID)
-			fmt.Printf("Number: %d\n", observation.Number)
-			fmt.Printf("Title: %s\n", observation.Title)
-			fmt.Printf("Status: %s\n", observation.Status)
-			fmt.Printf("Source: %s\n", observation.Source)
-			fmt.Printf("Environment key: %s\n", ptrStringOrDash(observation.DiscoveredInEnvironmentKey))
-			fmt.Printf("Environment version: %s\n", ptrStringOrDash(observation.DiscoveredInEnvironmentVersion))
-			fmt.Printf("Execution: %s\n", ptrStringOrDash(observation.CreatedDuringExecutionID))
-			fmt.Printf("Process run: %s\n", ptrStringOrDash(observation.DiscoveredDuringRunID))
-			fmt.Printf("Description: %s\n", ptrStringOrDash(observation.Description))
-			fmt.Printf("Attachments: %d\n", len(observation.Attachments))
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Observation #%d", observation.Number))
+			printHumanField(st, "id", observation.ID)
+			printHumanField(st, "title", observation.Title)
+			printHumanField(st, "status", st.Status(observation.Status))
+			printHumanField(st, "source", observation.Source)
+			printHumanField(st, "env key", ptrStringOrDash(observation.DiscoveredInEnvironmentKey))
+			printHumanField(st, "env version", ptrStringOrDash(observation.DiscoveredInEnvironmentVersion))
+			printHumanField(st, "execution", ptrStringOrDash(observation.CreatedDuringExecutionID))
+			printHumanField(st, "process run", ptrStringOrDash(observation.DiscoveredDuringRunID))
+			printHumanField(st, "description", ptrStringOrDash(observation.Description))
+			printHumanField(st, "attachments", fmt.Sprintf("%d", len(observation.Attachments)))
 			return nil
 		},
 	}
@@ -205,7 +207,10 @@ func newObservationsCreateCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(observation)
 			}
 
-			fmt.Printf("Created observation %s\n", observation.ID)
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Observation created")
+			printHumanField(st, "id", observation.ID)
+			printHumanField(st, "title", observation.Title)
 			return nil
 		},
 	}
@@ -270,20 +275,20 @@ func newObservationsSearchCommand(app *App) *cobra.Command {
 				return usageError(valueOrDash(ptrStringOrDash(resp.Error)), nil)
 			}
 
-			fmt.Printf("Matching observations: %d\n", resp.TotalCount)
-			fmt.Printf("%-36s %-6s %-12s %-8s %s\n", "ID", "NUM", "STATUS", "SCORE", "TITLE")
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Matching observations (%d)", resp.TotalCount))
 			for _, observation := range resp.Observations {
 				score := "-"
 				if observation.RelevanceScore != nil {
 					score = fmt.Sprintf("%.2f", *observation.RelevanceScore)
 				}
-				fmt.Printf("%-36s %-6d %-12s %-8s %s\n",
-					observation.ID,
-					observation.Number,
-					observation.Status,
-					score,
+				printHumanItem(st, humanKVSummary(
+					fmt.Sprintf("#%d", observation.Number),
+					st.Status(observation.Status),
+					"score "+score,
 					observation.Title,
-				)
+				))
+				printHumanField(st, "id", observation.ID)
 			}
 			return nil
 		},
@@ -345,7 +350,9 @@ func newObservationsPromoteToTicketCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(ticket)
 			}
 
-			fmt.Printf("Promoted observation to ticket %s\n", ticket.ID)
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Observation promoted to issue")
+			printHumanField(st, "issue", ticket.ID)
 			return nil
 		},
 	}
@@ -422,7 +429,11 @@ func newObservationsPromoteToWikiCommand(app *App) *cobra.Command {
 				})
 			}
 
-			fmt.Printf("Promoted observation %s to wiki\n", strings.TrimSpace(args[0]))
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "Observation promoted to wiki")
+			printHumanField(st, "observation", strings.TrimSpace(args[0]))
+			printHumanField(st, "section", section)
+			printHumanField(st, "mode", mode)
 			return nil
 		},
 	}

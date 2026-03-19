@@ -125,10 +125,7 @@ func newCIRunCommand(app *App) *cobra.Command {
 				if printer.JSON {
 					return nil
 				}
-				fmt.Printf("Run %s completed: state=%s conclusion=%s failed=%d blocked=%d\n", status.RunID, status.State, status.Conclusion, status.Failed, status.Blocked)
-				if status.AppURL != "" {
-					fmt.Printf("Artifacts: %s\n", status.AppURL)
-				}
+				printLegacyCIStatus(status, resp.StatusURL)
 				return nil
 			}
 
@@ -136,10 +133,12 @@ func newCIRunCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(resp)
 			}
 
-			fmt.Printf("Run created: %s\n", resp.RunID)
-			fmt.Printf("Status URL: %s\n", resp.StatusURL)
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "CI run created")
+			printHumanField(st, "run id", resp.RunID)
+			printHumanField(st, "status url", resp.StatusURL)
 			if resp.AppURL != "" {
-				fmt.Printf("App URL: %s\n", resp.AppURL)
+				printHumanField(st, "app url", resp.AppURL)
 			}
 			return nil
 		},
@@ -181,13 +180,7 @@ func newCIStatusCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(status)
 			}
 
-			fmt.Printf("Run: %s\n", status.RunID)
-			fmt.Printf("State: %s\n", status.State)
-			fmt.Printf("Conclusion: %s\n", status.Conclusion)
-			fmt.Printf("Total=%d Passed=%d Failed=%d Blocked=%d Pending=%d Aborted=%d\n", status.Total, status.Passed, status.Failed, status.Blocked, status.Pending, status.Aborted)
-			if status.AppURL != "" {
-				fmt.Printf("App URL: %s\n", status.AppURL)
-			}
+			printLegacyCIStatus(status, client.StatusURL(status.RunID))
 			return nil
 		},
 	}
@@ -225,10 +218,7 @@ func newCIWaitCommand(app *App) *cobra.Command {
 			}
 
 			if status != nil && !printer.JSON {
-				fmt.Printf("Run %s completed: state=%s conclusion=%s failed=%d blocked=%d\n", status.RunID, status.State, status.Conclusion, status.Failed, status.Blocked)
-				if status.AppURL != "" {
-					fmt.Printf("Artifacts: %s\n", status.AppURL)
-				}
+				printLegacyCIStatus(status, client.StatusURL(status.RunID))
 			}
 
 			if code != ExitOK {
@@ -270,7 +260,10 @@ func newCICancelCommand(app *App) *cobra.Command {
 				})
 			}
 
-			fmt.Printf("Run %s cancelled\n", args[0])
+			st := output.NewStyler()
+			printHumanHeader(st, "ok", "CI run cancelled")
+			printHumanField(st, "run id", args[0])
+			printHumanField(st, "reason", valueOrDash(reason))
 			return nil
 		},
 	}
@@ -343,9 +336,16 @@ func newCIListCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(resp)
 			}
 
-			fmt.Printf("Runs: %d\n", resp.TotalCount)
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("CI runs (%d)", resp.TotalCount))
 			for _, item := range resp.Items {
-				fmt.Printf("- %s state=%s conclusion=%s failed=%d blocked=%d\n", item.RunID, item.State, item.Conclusion, item.Failed, item.Blocked)
+				printHumanItem(st, humanKVSummary(
+					item.RunID,
+					st.Status(item.State),
+					st.Status(item.Conclusion),
+					fmt.Sprintf("failed %d", item.Failed),
+					fmt.Sprintf("blocked %d", item.Blocked),
+				))
 			}
 			return nil
 		},
@@ -457,6 +457,34 @@ func emitStatusOutputs(status api.CiRunStatusResponse, statusURL string) {
 		"aborted":    strconv.Itoa(status.Aborted),
 		"app_url":    status.AppURL,
 	})
+}
+
+func printLegacyCIStatus(status *api.CiRunStatusResponse, statusURL string) {
+	if status == nil {
+		return
+	}
+	st := output.NewStyler()
+	kind := "info"
+	title := "CI run status"
+	switch strings.ToLower(strings.TrimSpace(status.Conclusion)) {
+	case "passed":
+		kind = "ok"
+		title = "CI run passed"
+	case "failed", "blocked", "aborted", "cancelled", "canceled":
+		kind = "fail"
+		title = "CI run needs attention"
+	}
+	printHumanHeader(st, kind, title)
+	printHumanField(st, "run id", status.RunID)
+	printHumanField(st, "state", st.Status(status.State))
+	printHumanField(st, "conclusion", st.Status(status.Conclusion))
+	printHumanField(st, "totals", fmt.Sprintf("%d passed, %d failed, %d blocked, %d pending, %d aborted", status.Passed, status.Failed, status.Blocked, status.Pending, status.Aborted))
+	if statusURL != "" {
+		printHumanField(st, "status url", statusURL)
+	}
+	if status.AppURL != "" {
+		printHumanField(st, "app url", status.AppURL)
+	}
 }
 
 func generateID() string {

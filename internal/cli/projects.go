@@ -5,6 +5,7 @@ import (
 
 	"github.com/certyn/certyn-cli/internal/api"
 	"github.com/certyn/certyn-cli/internal/config"
+	"github.com/certyn/certyn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -42,8 +43,11 @@ func newProjectsListCommand(app *App) *cobra.Command {
 			if printer.JSON {
 				return printer.EmitJSON(resp)
 			}
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Projects (%d)", resp.TotalCount))
 			for _, project := range resp.Items {
-				fmt.Printf("- %s slug=%s name=%s\n", project.ID, project.Slug, project.Name)
+				printHumanItem(st, fmt.Sprintf("%s (%s)", project.Name, project.Slug))
+				printHumanField(st, "id", project.ID)
 			}
 			return nil
 		},
@@ -76,9 +80,11 @@ func newProjectsGetCommand(app *App) *cobra.Command {
 			if printer.JSON {
 				return printer.EmitJSON(project)
 			}
-			fmt.Printf("Project %s\n", project.ID)
-			fmt.Printf("Name: %s\n", project.Name)
-			fmt.Printf("Slug: %s\n", project.Slug)
+			st := output.NewStyler()
+			printHumanHeader(st, "info", "Project")
+			printHumanField(st, "id", project.ID)
+			printHumanField(st, "name", project.Name)
+			printHumanField(st, "slug", project.Slug)
 			return nil
 		},
 	}

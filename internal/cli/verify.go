@@ -14,6 +14,7 @@ import (
 
 	"github.com/certyn/certyn-cli/internal/api"
 	"github.com/certyn/certyn-cli/internal/config"
+	"github.com/certyn/certyn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -804,116 +805,161 @@ func exitCodeFromError(err error, fallback int) int {
 }
 
 func printVerifyHumanSummary(result verifyOutput, keepEnv bool) {
-	fmt.Printf("Verification mode: %s\n", result.Mode)
+	st := output.NewStyler()
+
+	printHumanHeader(st, verifySummaryKind(result), verifySummaryTitle(result))
+	printHumanField(st, "mode", result.Mode)
 	if result.EnvironmentMode != "" {
-		fmt.Printf("Environment mode: %s\n", result.EnvironmentMode)
+		printHumanField(st, "target", result.EnvironmentMode)
 	}
 	if result.Mode == "suite" {
-		fmt.Printf("Suite: %s\n", result.Suite)
-		if result.ProcessSlug != "" {
-			fmt.Printf("Process slug: %s\n", result.ProcessSlug)
-		}
-	} else {
-		fmt.Printf("Tags: %s\n", strings.Join(result.Tags, ", "))
+		printHumanField(st, "process", firstNonEmpty(result.ProcessSlug, result.Suite))
+	} else if len(result.Tags) > 0 {
+		printHumanField(st, "tags", strings.Join(result.Tags, ", "))
 	}
 	if strings.TrimSpace(result.URL) != "" {
-		fmt.Printf("URL: %s\n", result.URL)
+		printHumanField(st, "url", result.URL)
 	}
-
 	if result.EnvironmentKey != "" {
-		fmt.Printf("Environment key: %s\n", result.EnvironmentKey)
+		printHumanField(st, "environment", result.EnvironmentKey)
 	}
 	if result.RunID != "" {
-		fmt.Printf("Run ID: %s\n", result.RunID)
+		printHumanField(st, "run id", result.RunID)
 	}
-	if result.StatusURL != "" {
-		fmt.Printf("Status URL: %s\n", result.StatusURL)
-	}
-	if result.AppURL != "" {
-		fmt.Printf("App URL: %s\n", result.AppURL)
-	}
-	if result.State != "" {
-		fmt.Printf("State: %s\n", result.State)
-	}
-	if result.Conclusion != "" {
-		fmt.Printf("Conclusion: %s\n", result.Conclusion)
+	if result.State != "" || result.Conclusion != "" {
+		printHumanField(st, "result", humanKVSummary(
+			firstNonEmpty(result.State, ""),
+			firstNonEmpty(result.Conclusion, ""),
+		))
 	}
 	if result.RunID != "" {
-		fmt.Printf("Totals: total=%d passed=%d failed=%d blocked=%d pending=%d aborted=%d\n",
-			result.Total,
+		printHumanField(st, "totals", fmt.Sprintf(
+			"%d passed, %d failed, %d blocked, %d pending, %d aborted",
 			result.Passed,
 			result.Failed,
 			result.Blocked,
 			result.Pending,
 			result.Aborted,
-		)
+		))
 	}
 	if result.ExecutionTotal > 0 || len(result.Executions) > 0 {
-		fmt.Printf(
-			"Execution totals: total=%d passed=%d failed=%d blocked=%d running=%d pending=%d\n",
+		printHumanField(st, "executions", fmt.Sprintf(
+			"%d total, %d passed, %d failed, %d blocked, %d running, %d pending",
 			result.ExecutionTotal,
 			result.ExecutionPassed,
 			result.ExecutionFailed,
 			result.ExecutionBlocked,
 			result.ExecutionRunning,
 			result.ExecutionPending,
-		)
+		))
 	}
-	for _, execution := range result.Executions {
-		testCase := valueOrDash(execution.TestCaseName)
-		if execution.TestCaseNumber > 0 {
-			testCase = fmt.Sprintf("TC-%d %s", execution.TestCaseNumber, valueOrDash(execution.TestCaseName))
-		}
-		fmt.Printf("- execution=%s outcome=%s status=%s testcase=%s session=%s\n",
-			valueOrDash(execution.ExecutionID),
-			valueOrDash(execution.Outcome),
-			valueOrDash(execution.Status),
-			testCase,
-			valueOrDash(execution.AgentSessionID),
-		)
-		if execution.ConversationCommand != "" {
-			fmt.Printf("  conversation: %s\n", execution.ConversationCommand)
+	switch {
+	case len(result.Diagnostics) > 0:
+		printHumanField(st, "diagnostics", fmt.Sprintf("%d failure summaries collected", len(result.Diagnostics)))
+	case result.Conclusion == "passed":
+		printHumanField(st, "diagnostics", "not needed")
+	case result.DiagnosticsCollected:
+		printHumanField(st, "diagnostics", "none collected")
+	}
+	if result.StatusURL != "" {
+		printHumanField(st, "status url", result.StatusURL)
+	}
+	if result.AppURL != "" {
+		printHumanField(st, "app url", result.AppURL)
+	}
+
+	if len(result.Executions) > 0 {
+		fmt.Println()
+		printHumanHeader(st, "info", "Executions")
+		for _, execution := range result.Executions {
+			testCase := valueOrDash(execution.TestCaseName)
+			if execution.TestCaseNumber > 0 {
+				testCase = fmt.Sprintf("TC-%d %s", execution.TestCaseNumber, valueOrDash(execution.TestCaseName))
+			}
+			fmt.Printf(
+				"  - %s %s (%s)\n",
+				st.Status(firstNonEmpty(execution.Outcome, execution.Status)),
+				testCase,
+				valueOrDash(execution.ExecutionID),
+			)
+			if execution.ConversationCommand != "" {
+				printHumanField(st, "conversation", execution.ConversationCommand)
+			}
 		}
 	}
+
 	if len(result.Diagnostics) > 0 {
-		fmt.Println("Failure diagnostics:")
+		fmt.Println()
+		printHumanHeader(st, "warn", "Failure diagnostics")
 		for _, diagnostic := range result.Diagnostics {
 			fmt.Printf(
-				"- execution=%s reason=%s summary=%s tool_errors=%d policy_denied=%d network_4xx=%d network_5xx=%d\n",
+				"  - execution=%s reason=%s summary=%s\n",
 				valueOrDash(diagnostic.ExecutionID),
 				valueOrDash(diagnostic.PrimaryFailureReason),
 				valueOrDash(diagnostic.FailureSummary),
-				diagnostic.Counts.ToolErrors,
-				diagnostic.Counts.PolicyDenied,
-				diagnostic.Counts.Network4xx,
-				diagnostic.Counts.Network5xx,
 			)
+			printHumanField(st, "tool errors", fmt.Sprintf("%d", diagnostic.Counts.ToolErrors))
+			printHumanField(st, "policy denied", fmt.Sprintf("%d", diagnostic.Counts.PolicyDenied))
+			printHumanField(st, "network 4xx", fmt.Sprintf("%d", diagnostic.Counts.Network4xx))
+			printHumanField(st, "network 5xx", fmt.Sprintf("%d", diagnostic.Counts.Network5xx))
 			if diagnostic.DiagnoseCommand != "" {
-				fmt.Printf("  diagnose: %s\n", diagnostic.DiagnoseCommand)
+				printHumanField(st, "diagnose", diagnostic.DiagnoseCommand)
 			}
 			if diagnostic.ConversationCommand != "" {
-				fmt.Printf("  conversation: %s\n", diagnostic.ConversationCommand)
+				printHumanField(st, "conversation", diagnostic.ConversationCommand)
 			}
 		}
 	}
 	if len(result.DiagnosticsErrors) > 0 {
-		fmt.Printf("Failure diagnostics errors: %d\n", len(result.DiagnosticsErrors))
+		fmt.Println()
+		printHumanHeader(st, "warn", "Diagnostics errors")
 		for _, entry := range result.DiagnosticsErrors {
-			fmt.Printf("- execution=%s error=%s\n", valueOrDash(entry.ExecutionID), entry.Error)
+			fmt.Printf("  - execution=%s error=%s\n", valueOrDash(entry.ExecutionID), entry.Error)
 		}
 	}
 	if result.ExecutionDetailsError != "" {
-		fmt.Printf("Execution details: unavailable (%s)\n", result.ExecutionDetailsError)
+		fmt.Println()
+		printHumanField(st, "execution details", "unavailable ("+result.ExecutionDetailsError+")")
 	}
 
 	switch {
 	case result.EnvironmentMode != "ephemeral":
-		// no-op for existing environment mode
+		return
 	case keepEnv && result.EnvironmentKey != "":
-		fmt.Printf("Cleanup: skipped (kept environment %s)\n", result.EnvironmentKey)
+		printHumanField(st, "cleanup", fmt.Sprintf("skipped (kept environment %s)", result.EnvironmentKey))
 	case result.EnvironmentDeleted:
-		fmt.Println("Cleanup: environment deleted")
+		printHumanField(st, "cleanup", "environment deleted")
 	case result.EnvironmentKey != "":
-		fmt.Println("Cleanup: environment not deleted")
+		printHumanField(st, "cleanup", "environment not deleted")
+	}
+}
+
+func verifySummaryKind(result verifyOutput) string {
+	switch strings.ToLower(strings.TrimSpace(result.Conclusion)) {
+	case "passed":
+		return "ok"
+	case "failed", "blocked", "aborted", "cancelled", "canceled":
+		return "fail"
+	}
+	switch strings.ToLower(strings.TrimSpace(result.State)) {
+	case "completed":
+		return "info"
+	case "running", "queued", "pending":
+		return "warn"
+	default:
+		return "info"
+	}
+}
+
+func verifySummaryTitle(result verifyOutput) string {
+	switch strings.ToLower(strings.TrimSpace(result.Conclusion)) {
+	case "passed":
+		return "Run passed"
+	case "failed", "blocked":
+		return "Run needs attention"
+	case "aborted", "cancelled", "canceled":
+		return "Run aborted"
+	default:
+		return "Run summary"
 	}
 }

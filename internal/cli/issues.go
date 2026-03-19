@@ -7,6 +7,7 @@ import (
 
 	"github.com/certyn/certyn-cli/internal/api"
 	"github.com/certyn/certyn-cli/internal/config"
+	"github.com/certyn/certyn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -108,20 +109,19 @@ func newIssuesListCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(resp)
 			}
 
-			fmt.Printf("Issues: %d\n", resp.TotalCount)
-			fmt.Printf("%-36s %-6s %-10s %-10s %-10s %-12s %-12s %s\n",
-				"ID", "NUM", "SEVERITY", "STATUS", "ACTIVITY", "ENV_VERSION", "TYPE", "TITLE")
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Issues (%d)", resp.TotalCount))
 			for _, issue := range resp.Items {
-				fmt.Printf("%-36s %-6d %-10s %-10s %-10s %-12s %-12s %s\n",
-					issue.ID,
-					issue.Number,
-					issue.Severity,
-					issue.Status,
+				printHumanItem(st, humanKVSummary(
+					fmt.Sprintf("#%d", issue.Number),
+					st.Status(issue.Severity),
+					st.Status(issue.Status),
 					ptrStringOrDash(issue.RunActivity),
-					ptrStringOrDash(issue.EnvironmentVersion),
 					issue.Type,
 					issue.Title,
-				)
+				))
+				printHumanField(st, "id", issue.ID)
+				printHumanField(st, "env version", ptrStringOrDash(issue.EnvironmentVersion))
 			}
 			return nil
 		},
@@ -169,15 +169,16 @@ func newIssuesGetCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(issue)
 			}
 
-			fmt.Printf("Issue %s\n", issue.ID)
-			fmt.Printf("Number: %d\n", issue.Number)
-			fmt.Printf("Title: %s\n", issue.Title)
-			fmt.Printf("Status: %s\n", issue.Status)
-			fmt.Printf("Severity: %s\n", issue.Severity)
-			fmt.Printf("Type: %s\n", issue.Type)
-			fmt.Printf("Activity: %s\n", ptrStringOrDash(issue.RunActivity))
-			fmt.Printf("Environment version: %s\n", ptrStringOrDash(issue.EnvironmentVersion))
-			fmt.Printf("Description: %s\n", ptrStringOrDash(issue.Description))
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Issue #%d", issue.Number))
+			printHumanField(st, "id", issue.ID)
+			printHumanField(st, "title", issue.Title)
+			printHumanField(st, "status", st.Status(issue.Status))
+			printHumanField(st, "severity", st.Status(issue.Severity))
+			printHumanField(st, "type", issue.Type)
+			printHumanField(st, "activity", ptrStringOrDash(issue.RunActivity))
+			printHumanField(st, "env version", ptrStringOrDash(issue.EnvironmentVersion))
+			printHumanField(st, "description", ptrStringOrDash(issue.Description))
 			return nil
 		},
 	}
@@ -216,19 +217,18 @@ func newIssuesOverviewCommand(app *App) *cobra.Command {
 				return printer.EmitJSON(resp)
 			}
 
-			fmt.Printf("Issues overview: %d\n", resp.TotalCount)
-			fmt.Printf("%-36s %-6s %-10s %-10s %-10s %-12s %s\n",
-				"ID", "NUM", "SEVERITY", "STATUS", "ACTIVITY", "ENV", "TITLE")
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Issue overview (%d)", resp.TotalCount))
 			for _, issue := range resp.Items {
-				fmt.Printf("%-36s %-6d %-10s %-10s %-10s %-12s %s\n",
-					issue.ID,
-					issue.Number,
-					issue.Severity,
-					issue.Status,
-					issue.RunActivity,
-					ptrStringOrDash(issue.EnvironmentKey),
+				printHumanItem(st, humanKVSummary(
+					fmt.Sprintf("#%d", issue.Number),
+					st.Status(issue.Severity),
+					st.Status(issue.Status),
+					valueOrDash(issue.RunActivity),
 					issue.Title,
-				)
+				))
+				printHumanField(st, "id", issue.ID)
+				printHumanField(st, "env", ptrStringOrDash(issue.EnvironmentKey))
 			}
 			return nil
 		},

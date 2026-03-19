@@ -5,6 +5,7 @@ import (
 
 	"github.com/certyn/certyn-cli/internal/api"
 	"github.com/certyn/certyn-cli/internal/config"
+	"github.com/certyn/certyn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -49,8 +50,12 @@ func newEnvListCommand(app *App) *cobra.Command {
 			if printer.JSON {
 				return printer.EmitJSON(resp)
 			}
+			st := output.NewStyler()
+			printHumanHeader(st, "info", fmt.Sprintf("Environments (%d)", resp.TotalCount))
 			for _, env := range resp.Items {
-				fmt.Printf("- %s key=%s baseUrl=%s default=%t\n", env.ID, env.Key, env.BaseURL, env.IsDefault)
+				printHumanItem(st, humanKVSummary(env.Key, env.BaseURL))
+				printHumanField(st, "id", env.ID)
+				printHumanField(st, "default", humanBool(st, env.IsDefault))
 			}
 			return nil
 		},
@@ -97,10 +102,12 @@ func newEnvGetCommand(app *App) *cobra.Command {
 			if printer.JSON {
 				return printer.EmitJSON(env)
 			}
-			fmt.Printf("Environment %s\n", env.ID)
-			fmt.Printf("Key: %s\n", env.Key)
-			fmt.Printf("Base URL: %s\n", env.BaseURL)
-			fmt.Printf("Version: %s\n", env.Version)
+			st := output.NewStyler()
+			printHumanHeader(st, "info", "Environment")
+			printHumanField(st, "id", env.ID)
+			printHumanField(st, "key", env.Key)
+			printHumanField(st, "base url", env.BaseURL)
+			printHumanField(st, "version", env.Version)
 			return nil
 		},
 	}

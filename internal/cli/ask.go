@@ -8,6 +8,7 @@ import (
 
 	"github.com/certyn/certyn-cli/internal/api"
 	"github.com/certyn/certyn-cli/internal/config"
+	"github.com/certyn/certyn-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -213,18 +214,25 @@ func applyAskError(result *askOutput, err error, fallbackCode int) {
 }
 
 func printAskHumanOutput(result askOutput) {
+	st := output.NewStyler()
+
 	for _, warning := range result.Warnings {
-		fmt.Printf("Warning: %s\n", warning)
+		fmt.Printf("%s %s\n", st.Badge("warn"), warning)
 	}
 	if strings.TrimSpace(result.Content) != "" {
+		if len(result.Warnings) > 0 {
+			fmt.Println()
+		}
+		printHumanHeader(st, "info", "Advisor answer")
+		fmt.Println()
 		fmt.Println(result.Content)
 	}
-	if result.ConversationID != "" || result.MessageID != "" {
-		fmt.Printf(
-			"conversation_id=%s message_id=%s tool_calls=%d\n",
-			valueOrDash(result.ConversationID),
-			valueOrDash(result.MessageID),
-			len(result.ToolCalls),
-		)
+	if result.ProjectID != "" || result.ConversationID != "" || result.MessageID != "" || len(result.ToolCalls) > 0 {
+		fmt.Println()
+		printHumanHeader(st, "info", "Context")
+		printHumanField(st, "project", valueOrDash(result.ProjectID))
+		printHumanField(st, "conversation", valueOrDash(result.ConversationID))
+		printHumanField(st, "message", valueOrDash(result.MessageID))
+		printHumanField(st, "tool calls", fmt.Sprintf("%d", len(result.ToolCalls)))
 	}
 }
